@@ -681,38 +681,45 @@ function buildCorrect(q){
   if(q.type==='text')
     return '<div style="font-size:11px;color:var(--text3);margin-top:4px">&#9998; Correction manuelle par points</div>';
   if(q.type==='table'){
-    // Points par ligne + réponses attendues par colonne
     const cols=q.columns||[];
     const rows=q.rows||[''];
-    // Initialiser correctAnswer pour tableau si besoin
+    // Initialiser correctAnswer [ri][ci] = {answer, points}
     if(!q.correctAnswer||!Array.isArray(q.correctAnswer)){
-      q.correctAnswer=rows.map(()=>cols.map(()=>''));
+      q.correctAnswer=rows.map(()=>cols.map(()=>({answer:'',points:1})));
     }
-    // Points par ligne
-    if(!q.pointsPerRow||q.pointsPerRow.length!==rows.length){
-      q.pointsPerRow=rows.map(()=>1);
-    }
+    // S'assurer que chaque cellule a bien le bon format
+    q.correctAnswer=rows.map((r,ri)=>cols.map((_,ci)=>{
+      const existing=q.correctAnswer&&q.correctAnswer[ri]&&q.correctAnswer[ri][ci];
+      if(existing&&typeof existing==='object')return existing;
+      return {answer:existing||'',points:1};
+    }));
     let html='<div style="margin-top:.75rem">';
-    html+='<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">Réponses attendues par ligne :</div>';
+    html+='<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">Réponses attendues et points par cellule :</div>';
     html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
     html+='<thead><tr>';
-    html+='<th style="background:var(--bg3);padding:5px 8px;border:.5px solid var(--border2);text-align:left;width:35%">Phrase / Ligne</th>';
-    cols.forEach(c=>{html+='<th style="background:var(--bg3);padding:5px 8px;border:.5px solid var(--border2);text-align:left">'+esc(c)+'</th>';});
-    html+='<th style="background:var(--bg3);padding:5px 8px;border:.5px solid var(--border2);text-align:center;width:60px">Pts</th>';
+    html+='<th style="background:var(--bg3);padding:5px 8px;border:.5px solid var(--border2);text-align:left;min-width:120px">Phrase / Ligne</th>';
+    cols.forEach(c=>{
+      html+='<th style="background:var(--bg3);padding:5px 8px;border:.5px solid var(--border2);text-align:left;min-width:140px">'+esc(c)+'</th>';
+    });
     html+='</tr></thead><tbody>';
     rows.forEach((r,ri)=>{
       html+='<tr>';
-      html+='<td style="border:.5px solid var(--border2);padding:4px 6px;background:var(--bg2);font-size:11px;color:var(--text2)">'+esc(r||'Ligne '+(ri+1))+'</td>';
+      html+='<td style="border:.5px solid var(--border2);padding:6px 8px;background:var(--bg2);font-size:11px;color:var(--text2);vertical-align:middle">'+esc(r||'Ligne '+(ri+1))+'</td>';
       cols.forEach((_,ci)=>{
-        const val=(q.correctAnswer&&q.correctAnswer[ri])?q.correctAnswer[ri][ci]||'':'';
-        html+='<td style="border:.5px solid var(--border2);padding:0"><input type="text" value="'+esc(val)+'" placeholder="Réponse attendue" id="tca-'+q.id+'-'+ri+'-'+ci+'" style="width:100%;border:none;background:transparent;padding:5px 7px;font-size:12px;font-family:inherit"></td>';
+        const cell=q.correctAnswer[ri][ci];
+        const ans=cell?cell.answer||'':'';
+        const pts=cell?cell.points!==undefined?cell.points:1:1;
+        html+='<td style="border:.5px solid var(--border2);padding:3px">';
+        html+='<input type="text" value="'+esc(ans)+'" placeholder="Réponse attendue" id="tca-'+q.id+'-'+ri+'-'+ci+'" style="width:100%;border:none;border-bottom:.5px solid var(--border2);background:transparent;padding:4px 6px;font-size:12px;font-family:inherit;display:block">';
+        html+='<div style="display:flex;align-items:center;gap:3px;margin-top:3px">';
+        html+='<span style="font-size:10px;color:var(--text3)">pts:</span>';
+        html+='<input type="number" min="0" max="100" value="'+pts+'" id="tpt-'+q.id+'-'+ri+'-'+ci+'" style="width:45px;border:.5px solid var(--border2);border-radius:3px;padding:2px 4px;font-size:11px;font-family:inherit;text-align:center">';
+        html+='</div></td>';
       });
-      const pts=(q.pointsPerRow&&q.pointsPerRow[ri]!==undefined)?q.pointsPerRow[ri]:1;
-      html+='<td style="border:.5px solid var(--border2);padding:0"><input type="number" min="0" max="100" value="'+pts+'" id="tpr-'+q.id+'-'+ri+'" style="width:100%;border:none;background:transparent;padding:5px 4px;font-size:12px;text-align:center;font-family:inherit"></td>';
       html+='</tr>';
     });
     html+='</tbody></table></div>';
-    html+='<div style="font-size:10px;color:var(--text3);margin-top:4px">Laissez vide si pas de réponse attendue pour une colonne.</div>';
+    html+='<div style="font-size:10px;color:var(--text3);margin-top:4px">Pour chaque cellule : saisissez la réponse attendue et les points attribués si correct.</div>';
     html+='</div>';
     return html;
   }
@@ -765,8 +772,14 @@ const togCA=(qid,oi)=>{
 };
 function calcTotalPts(q){
   return(q.questions||[]).reduce((s,qq)=>{
-    if(qq.type==='table'&&Array.isArray(qq.pointsPerRow)&&qq.pointsPerRow.length>0){
-      return s+qq.pointsPerRow.reduce((a,p)=>a+(+p||0),0);
+    if(qq.type==='table'&&Array.isArray(qq.correctAnswer)){
+      let cellTotal=0;
+      qq.correctAnswer.forEach(row=>{
+        (row||[]).forEach(cell=>{
+          if(cell&&typeof cell==='object')cellTotal+=(+cell.points||0);
+        });
+      });
+      return s+(cellTotal||qq.points||1);
     }
     return s+(qq.points||1);
   },0);
@@ -790,18 +803,20 @@ function autoGrade(q,answers){
       sc[qq.id]=(+ans===+ca)?pts:0;
     } else if(qq.type==='table'){
       if(!ans||!ans.rows){sc[qq.id]=null;return;}
-      const rowScores=(ans.rows||[]).map((row,ri)=>{
+      let totalEarned=0,hasManual=false;
+      (ans.rows||[]).forEach((row,ri)=>{
         const expRow=Array.isArray(ca)?ca[ri]:null;
-        const rowPts=Array.isArray(qq.pointsPerRow)?(+(qq.pointsPerRow[ri])||0):1;
-        if(!expRow||expRow.every(v=>!v))return null;
-        const allOk=(qq.columns||[]).every((_,ci)=>{
-          const exp=(expRow[ci]||'').trim().toLowerCase();
-          const got=((row.cols&&row.cols[ci])||'').trim().toLowerCase();
-          return !exp||exp===got;
+        (qq.columns||[]).forEach((_,ci)=>{
+          const cell=expRow&&expRow[ci];
+          const expAns=cell&&typeof cell==='object'?cell.answer||'':cell||'';
+          const cellPts=cell&&typeof cell==='object'?+(cell.points||0):0;
+          const got=((row.cols&&row.cols[ci])||'').trim();
+          if(!expAns.trim()){hasManual=true;return;} // pas de réponse attendue = manuel
+          const correct=got.toLowerCase()===expAns.trim().toLowerCase();
+          totalEarned+=correct?cellPts:0;
         });
-        return allOk?rowPts:0;
       });
-      sc[qq.id]=rowScores.every(s=>s!==null)?rowScores.reduce((a,s)=>a+s,0):null;
+      sc[qq.id]=hasManual?null:totalEarned;
     } else {
       sc[qq.id]=null;
     }
@@ -823,7 +838,7 @@ function attachBuildEvents(){
     const qid=inp.id.replace('scale-ca-','');
     inp.addEventListener('input',()=>uQ(qid,'correctAnswer',+inp.value));
   });
-  // Table correct answers
+  // Table correct answers (réponse par cellule)
   document.querySelectorAll('[id^="tca-"]').forEach(inp=>{
     const parts=inp.id.split('-');// tca-QID-RI-CI
     const qid=parts[1],ri=+parts[2],ci=+parts[3];
@@ -831,17 +846,22 @@ function attachBuildEvents(){
       const q=bQs.find(x=>x.id===qid);if(!q)return;
       if(!Array.isArray(q.correctAnswer))q.correctAnswer=[];
       if(!q.correctAnswer[ri])q.correctAnswer[ri]=[];
-      q.correctAnswer[ri][ci]=inp.value;
+      if(!q.correctAnswer[ri][ci]||typeof q.correctAnswer[ri][ci]!=='object')
+        q.correctAnswer[ri][ci]={answer:'',points:1};
+      q.correctAnswer[ri][ci].answer=inp.value;
     });
   });
-  // Table points per row
-  document.querySelectorAll('[id^="tpr-"]').forEach(inp=>{
-    const parts=inp.id.split('-');// tpr-QID-RI
-    const qid=parts[1],ri=+parts[2];
+  // Table points par cellule
+  document.querySelectorAll('[id^="tpt-"]').forEach(inp=>{
+    const parts=inp.id.split('-');// tpt-QID-RI-CI
+    const qid=parts[1],ri=+parts[2],ci=+parts[3];
     inp.addEventListener('input',()=>{
       const q=bQs.find(x=>x.id===qid);if(!q)return;
-      if(!Array.isArray(q.pointsPerRow))q.pointsPerRow=[];
-      q.pointsPerRow[ri]=+inp.value;
+      if(!Array.isArray(q.correctAnswer))q.correctAnswer=[];
+      if(!q.correctAnswer[ri])q.correctAnswer[ri]=[];
+      if(!q.correctAnswer[ri][ci]||typeof q.correctAnswer[ri][ci]!=='object')
+        q.correctAnswer[ri][ci]={answer:'',points:1};
+      q.correctAnswer[ri][ci].points=+inp.value;
     });
   });
 }
@@ -938,31 +958,35 @@ async function viewResponses(qid){
       let ansHtml='';
       if(qq.type==='table'&&ans&&ans.rows){
         const ca2=qq.correctAnswer;
-        const ppr=qq.pointsPerRow;
-        let tHtml='<table class="rtbl" style="margin:.35rem 0"><thead><tr>';
+        let tHtml='<div style="overflow-x:auto"><table class="rtbl" style="margin:.35rem 0;width:100%"><thead><tr>';
         tHtml+='<th>Phrase</th>'+(qq.columns||[]).map(c=>'<th>'+esc(c)+'</th>').join('');
-        tHtml+='<th style="text-align:center">Pts</th></tr></thead><tbody>';
+        tHtml+='</tr></thead><tbody>';
         ans.rows.forEach((rw,ri)=>{
           const expRow=Array.isArray(ca2)?ca2[ri]:null;
-          const rowPts=Array.isArray(ppr)?(+(ppr[ri])||0):1;
-          tHtml+='<tr><td>'+esc(rw.phrase||'')+'</td>';
+          tHtml+='<tr><td style="font-size:12px">'+esc(rw.phrase||'')+'</td>';
           (qq.columns||[]).forEach((_,ci)=>{
-            const got=esc((rw.cols&&rw.cols[ci])||'');
-            const exp=(expRow&&expRow[ci])?expRow[ci].trim():'';
-            let cellStyle='';
-            if(exp&&got){
-              const match=got.toLowerCase()===exp.toLowerCase();
-              cellStyle=match?'background:#eaf3de':'background:#fcebeb';
+            const got=((rw.cols&&rw.cols[ci])||'').trim();
+            const cell=expRow&&expRow[ci];
+            const expAns=cell&&typeof cell==='object'?cell.answer||'':cell||'';
+            const cellPts=cell&&typeof cell==='object'?+(cell.points||0):0;
+            const hasExp=expAns.trim()!=='';
+            let bg='';
+            if(hasExp&&got){
+              bg=got.toLowerCase()===expAns.trim().toLowerCase()?'background:#eaf3de':'background:#fcebeb';
             }
-            const expHint=exp?'<div style="font-size:10px;color:#9a9893">Attendu: '+esc(exp)+'</div>':'';
-            tHtml+='<td style="'+cellStyle+'">'+got+expHint+'</td>';
+            const manCellKey='cell_'+ri+'_'+ci;
+            const manVal=manSc[qq.id]&&manSc[qq.id][manCellKey]!==undefined?manSc[qq.id][manCellKey]:'';
+            tHtml+='<td style="'+bg+';vertical-align:top;padding:4px 6px">';
+            tHtml+='<div style="font-size:12px">'+esc(got||'—')+'</div>';
+            if(hasExp)tHtml+='<div style="font-size:10px;color:#9a9893">Attendu: <em>'+esc(expAns)+'</em></div>';
+            tHtml+='<div style="display:flex;align-items:center;gap:3px;margin-top:3px">';
+            tHtml+='<input type="number" min="0" max="'+cellPts+'" value="'+manVal+'" placeholder="0-'+cellPts+'" id="ms-'+r.id+'-'+qq.id+'-c-'+ri+'-'+ci+'" style="width:48px;font-size:11px;padding:2px 4px;border:.5px solid var(--border2);border-radius:3px;text-align:center">';
+            tHtml+='<span style="font-size:10px;color:var(--text3)">/'+cellPts+' pt'+(cellPts>1?'s':'')+'</span>';
+            tHtml+='</div></td>';
           });
-          // Champ points manuel pour cette ligne
-          const msVal=(manSc[qq.id]&&manSc[qq.id]['row_'+ri]!==undefined)?manSc[qq.id]['row_'+ri]:(autoSc[qq.id]!==null&&autoSc[qq.id]!==undefined?'auto':'');
-          tHtml+='<td style="text-align:center;padding:2px 4px"><input type="number" min="0" max="'+rowPts+'" placeholder="0-'+rowPts+'" id="ms-'+r.id+'-'+qq.id+'-row-'+ri+'" value="'+(manSc[qq.id]&&manSc[qq.id]['row_'+ri]!==undefined?manSc[qq.id]['row_'+ri]:'')+'" style="width:52px;text-align:center;padding:3px 4px;font-size:12px;border:.5px solid var(--border2);border-radius:4px"><span style="font-size:10px;color:var(--text3)">/'+rowPts+'</span></td>';
           tHtml+='</tr>';
         });
-        tHtml+='</tbody></table>';
+        tHtml+='</tbody></table></div>';
         ansHtml=tHtml;
       } else if(qq.type==='checkbox'){
         ansHtml='<div class="corr-answer">'+esc(Array.isArray(ans)?ans.join(', '):(ans||'—'))+'</div>';
@@ -1020,14 +1044,16 @@ async function saveGrade(rid,qid){
   const manSc={};
   (q.questions||[]).forEach(qq=>{
     if(qq.type==='table'){
-      // Récupérer les points par ligne
-      const rowScores={};
+      // Récupérer les points par cellule
+      const cellScores={};
       const rows=(r.answers&&r.answers[qq.id]&&r.answers[qq.id].rows)||[];
       rows.forEach((_,ri)=>{
-        const el=document.getElementById('ms-'+rid+'-'+qq.id+'-row-'+ri);
-        if(el&&el.value!=='')rowScores['row_'+ri]=+el.value;
+        (qq.columns||[]).forEach((_c,ci)=>{
+          const el=document.getElementById('ms-'+rid+'-'+qq.id+'-c-'+ri+'-'+ci);
+          if(el&&el.value!=='')cellScores['cell_'+ri+'_'+ci]=+el.value;
+        });
       });
-      if(Object.keys(rowScores).length>0)manSc[qq.id]=rowScores;
+      if(Object.keys(cellScores).length>0)manSc[qq.id]=cellScores;
     } else {
       const el=document.getElementById('ms-'+rid+'-'+qq.id);
       if(el&&el.value!=='')manSc[qq.id]=+el.value;
@@ -1039,7 +1065,7 @@ async function saveGrade(rid,qid){
     const ms=manSc[qq.id];
     const as=autoSc[qq.id];
     if(qq.type==='table'){
-      if(ms&&typeof ms==='object'){
+      if(ms&&typeof ms==='object'&&Object.keys(ms).length>0){
         earned+=Object.values(ms).reduce((a,v)=>a+(+v||0),0);
       } else if(as!==null&&as!==undefined){
         earned+=+as;
