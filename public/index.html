@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EvalPro — Plateforme d'évaluation</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;--bg2:#f7f7f5;--bg3:#efefeb;--bg4:#e8e8e4;
+  --border:rgba(0,0,0,.10);--border2:rgba(0,0,0,.20);--border3:rgba(0,0,0,.30);
+  --text:#1a1a18;--text2:#5f5e5a;--text3:#9a9893;--text4:#c0beba;
+  --green-bg:#eaf3de;--green-text:#3b6d11;--green-border:#97c459;
+  --red-bg:#fcebeb;--red-text:#a32d2d;--red-border:#f09595;
+  --blue-bg:#e6f1fb;--blue-text:#185fa5;--blue-border:#85b7eb;
+  --amber-bg:#faeeda;--amber-text:#854f0b;--amber-border:#ef9f27;
+  --purple-bg:#eeedfe;--purple-text:#3c3489;--purple-border:#afa9ec;
+  --teal-bg:#e1f5ee;--teal-text:#0f6e56;--teal-border:#5dcaa5;
+  --r:8px;--rl:12px;--rxl:16px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;color:var(--text);background:var(--bg2);min-height:100vh}
+/* layout */
+#app{display:flex;min-height:100vh}
+#sidebar{width:220px;min-width:220px;background:var(--bg);border-right:.5px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:50}
+#main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+#topbar{background:var(--bg);border-bottom:.5px solid var(--border);height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;position:sticky;top:0;z-index:40}
+#content{flex:1;padding:1.75rem 1.75rem 4rem}
+/* sidebar */
+.sb-logo{padding:1rem 1.25rem;border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:8px}
+.sb-icon{width:28px;height:28px;background:var(--text);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--bg);font-size:13px;font-weight:700}
+.sb-text{font-size:14px;font-weight:600}
+.sb-sub{font-size:10px;color:var(--text3)}
+.sb-nav{flex:1;padding:.75rem 0;overflow-y:auto}
+.sb-sec{font-size:10px;font-weight:600;color:var(--text4);text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1.25rem .25rem}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 1.25rem;font-size:13px;color:var(--text2);cursor:pointer;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{color:var(--text);background:var(--bg2)}
+.nav-item.active{color:var(--text);background:var(--bg3);font-weight:500}
+.nav-icon{font-size:15px;width:18px;text-align:center}
+.nav-badge{margin-left:auto;font-size:10px;background:var(--bg3);color:var(--text2);padding:1px 6px;border-radius:99px}
+.sb-footer{border-top:.5px solid var(--border);padding:.75rem 1.25rem}
+.sb-uname{font-weight:500;font-size:13px}
+.sb-uinfo{font-size:12px;color:var(--text2)}
+/* topbar */
+.tb-title{font-size:14px;font-weight:500}
+.tb-actions{display:flex;gap:8px;align-items:center}
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;font-size:13px;font-family:inherit;border:.5px solid var(--border2);border-radius:var(--r);background:var(--bg);color:var(--text);cursor:pointer;white-space:nowrap;transition:background .1s,opacity .1s}
+.btn:hover{background:var(--bg2)}
+.btn-primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn-primary:hover{opacity:.82}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-xs{padding:3px 9px;font-size:11px}
+.btn-danger{color:var(--red-text);border-color:transparent}
+.btn-danger:hover{background:var(--red-bg);border-color:var(--red-border)}
+.btn:disabled{opacity:.4;cursor:default;pointer-events:none}
+.btn-icon{padding:6px;border-radius:var(--r);border:.5px solid var(--border);background:var(--bg);cursor:pointer;font-size:15px;display:inline-flex;align-items:center;justify-content:center}
+.btn-icon:hover{background:var(--bg2)}
+/* cards */
+.card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.25rem 1.5rem;margin-bottom:1rem}
+.sec-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.875rem}
+.pg-title{font-size:20px;font-weight:600;margin-bottom:.25rem}
+.pg-sub{font-size:13px;color:var(--text2);margin-bottom:1.5rem}
+/* stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.125rem 1.25rem}
+.stat-lbl{font-size:12px;color:var(--text2);margin-bottom:4px}
+.stat-val{font-size:26px;font-weight:600;line-height:1}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
+/* table */
+.dtbl{width:100%;border-collapse:collapse;font-size:13px}
+.dtbl th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:8px 12px;text-align:left;border-bottom:.5px solid var(--border2)}
+.dtbl td{padding:11px 12px;border-bottom:.5px solid var(--border);vertical-align:middle}
+.dtbl tr:last-child td{border-bottom:none}
+.dtbl tr:hover td{background:var(--bg2)}
+/* badges */
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.bg-green{background:var(--green-bg);color:var(--green-text)}
+.bg-blue{background:var(--blue-bg);color:var(--blue-text)}
+.bg-amber{background:var(--amber-bg);color:var(--amber-text)}
+.bg-red{background:var(--red-bg);color:var(--red-text)}
+.bg-purple{background:var(--purple-bg);color:var(--purple-text)}
+.bg-teal{background:var(--teal-bg);color:var(--teal-text)}
+.bg-gray{background:var(--bg3);color:var(--text2)}
+/* forms */
+.fgroup{margin-bottom:1rem}
+.flabel{font-size:13px;color:var(--text2);margin-bottom:5px;display:block}
+.fhint{font-size:11px;color:var(--text3);margin-top:4px}
+input[type=text],input[type=email],input[type=password],input[type=number],textarea,select{width:100%;font-size:14px;color:var(--text);background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--r);padding:9px 12px;font-family:inherit;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--border3);background:var(--bg)}
+textarea{resize:vertical;line-height:1.6}
+select{cursor:pointer}
+.frow2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.frow3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--text)}
+/* toast */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;padding:12px 18px;border-radius:var(--r);font-size:13px;z-index:9999;display:none;max-width:340px;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.toast.success{background:var(--green-bg);color:var(--green-text);border:.5px solid var(--green-border)}
+.toast.error{background:var(--red-bg);color:var(--red-text);border:.5px solid var(--red-border)}
+.toast.info{background:var(--blue-bg);color:var(--blue-text);border:.5px solid var(--blue-border)}
+/* modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg);border-radius:var(--rxl);padding:1.75rem;width:100%;max-width:560px;border:.5px solid var(--border2);margin:auto}
+.modal-xl{max-width:940px}
+.mhdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem}
+.mtitle{font-size:17px;font-weight:600}
+.msub{font-size:13px;color:var(--text2);margin-top:3px}
+.mactions{display:flex;justify-content:flex-end;gap:8px;margin-top:1.5rem;padding-top:1rem;border-top:.5px solid var(--border)}
+.close-btn{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);padding:2px 6px;border-radius:4px}
+.close-btn:hover{color:var(--text);background:var(--bg2)}
+/* builder */
+.q-block{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.125rem 1.25rem;margin-bottom:.75rem}
+.q-block:hover{border-color:var(--border2)}
+.q-bhdr{display:flex;align-items:center;gap:10px;margin-bottom:.75rem}
+.q-num{width:24px;height:24px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text2);flex-shrink:0}
+.q-bactions{margin-left:auto;display:flex;gap:4px}
+.opt-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.opt-row input{flex:1}
+.opt-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border3);flex-shrink:0}
+.opt-sq{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--border3);flex-shrink:0}
+/* table question */
+.tqtbl{width:100%;border-collapse:collapse;font-size:13px}
+.tqtbl th{background:var(--bg2);font-size:11px;font-weight:600;color:var(--text2);padding:7px 10px;border:.5px solid var(--border2);text-align:left}
+.tqtbl td{border:.5px solid var(--border2);padding:0}
+.tqtbl td textarea{width:100%;min-height:48px;border:none;background:transparent;resize:vertical;padding:7px 10px;font-size:13px;font-family:inherit;color:var(--text);outline:none}
+.tqtbl td textarea:focus{background:var(--bg2)}
+.tq-phrase{background:var(--bg2) !important;padding:9px 10px !important;font-size:13px;color:var(--text);line-height:1.5}
+/* respondent */
+.q-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.25rem 1.5rem;margin-bottom:1rem}
+.q-lbl{font-size:14px;font-weight:500;margin-bottom:.75rem;line-height:1.5}
+.q-req{color:var(--red-text);margin-left:2px}
+.r-opt{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border:.5px solid var(--border);border-radius:var(--r);margin-bottom:6px;cursor:pointer;font-size:13px;transition:background .1s}
+.r-opt:hover{background:var(--bg2)}
+.r-opt.selected{background:var(--blue-bg);border-color:var(--blue-border)}
+.scale-row{display:flex;gap:8px;flex-wrap:wrap}
+.scale-btn{width:40px;height:40px;border:.5px solid var(--border2);border-radius:var(--r);background:var(--bg);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.scale-btn:hover{background:var(--bg2)}
+.scale-btn.selected{background:var(--text);color:var(--bg);border-color:var(--text)}
+.ref-box{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--r);padding:1rem 1.25rem;font-size:13px;line-height:1.8;white-space:pre-wrap;max-height:260px;overflow-y:auto;margin-bottom:1rem}
+/* responses */
+.resp-item{background:var(--bg2);border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:.75rem;border:.5px solid var(--border)}
+.resp-meta{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem}
+.rtbl{width:100%;font-size:12px;border-collapse:collapse}
+.rtbl th{font-size:11px;color:var(--text2);padding:4px 8px;border-bottom:.5px solid var(--border);text-align:left;background:none}
+.rtbl td{padding:5px 8px;border-bottom:.5px solid var(--border);vertical-align:top;background:none}
+.ans-blk{margin-bottom:.5rem;font-size:13px}
+.ans-q{color:var(--text2);font-size:12px;margin-bottom:2px}
+.ans-a{font-weight:500}
+/* misc */
+.empty{text-align:center;padding:3rem 1rem;color:var(--text3)}
+.empty-icon{font-size:32px;margin-bottom:.75rem}
+.empty-title{font-size:15px;font-weight:500;color:var(--text2);margin-bottom:.5rem}
+.empty-sub{font-size:13px;line-height:1.6}
+.copy-link{display:flex;align-items:center;background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--r);padding:8px 12px;font-size:12px;font-family:monospace;color:var(--text2);word-break:break-all;flex:1}
+/* spinner */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--text);border-radius:50%;animation:spin .6s linear infinite}
+.big-spinner{width:32px;height:32px;border:3px solid var(--border2);border-top-color:var(--text);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* loading overlay */
+.lov{position:fixed;inset:0;background:rgba(255,255,255,.9);z-index:300;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-size:14px;color:var(--text2)}
+/* setup */
+.setup-wrap{max-width:660px;margin:3rem auto;padding:0 1rem}
+.step-row{display:flex;gap:14px;margin-bottom:1.5rem;align-items:flex-start}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.step-body{flex:1}
+.step-title{font-size:14px;font-weight:600;margin-bottom:.35rem}
+.step-desc{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:.6rem}
+code{font-family:monospace;background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:12px}
+pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;font-family:monospace;line-height:1.6;overflow-x:auto;white-space:pre-wrap;margin:.5rem 0;max-height:260px;overflow-y:auto}
+/* login */
+#login-screen{display:flex;min-height:100vh;align-items:center;justify-content:center;background:var(--bg2)}
+.login-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rxl);padding:2.5rem;width:100%;max-width:380px}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:2rem}
+.login-icon{width:36px;height:36px;background:var(--text);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--bg);font-size:16px;font-weight:700}
+/* respondent */
+#respondent-app{min-height:100vh;background:var(--bg2)}
+.r-header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5rem;height:52px;display:flex;align-items:center;justify-content:space-between}
+.r-content{max-width:740px;margin:0 auto;padding:1.75rem 1rem 4rem}
+@media(max-width:768px){#sidebar{display:none}#main{margin-left:0}.frow2,.frow3{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div id="toast" class="toast"></div>
+
+<!-- LOADING -->
+<div class="lov" id="lov"><div class="big-spinner"></div><div id="lov-msg">Connexion à Supabase...</div></div>
+
+<!-- SETUP -->
+<div id="setup-screen" style="display:none;background:var(--bg2);min-height:100vh;padding:2rem 1rem">
+  <div class="setup-wrap">
+    <div style="text-align:center;margin-bottom:2.5rem">
+      <div style="font-size:32px;margin-bottom:.5rem">⚙️</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:.5rem">Configuration EvalPro</div>
+      <div style="font-size:14px;color:var(--text2)">Connectez votre base de données Supabase en 3 étapes simples</div>
+    </div>
+    <div class="card">
+      <div class="step-row">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Créer les tables dans Supabase</div>
+          <div class="step-desc">Allez dans votre projet Supabase → <strong>SQL Editor</strong> → <strong>New query</strong>, collez le SQL ci-dessous et cliquez <strong>Run</strong>.</div>
+          <pre id="sql-block">create table if not exists questionnaires (
+  id text primary key,
+  code text unique not null,
+  title text not null,
+  description text,
+  ref_text text,
+  type text default 'mixed',
+  questions jsonb default '[]',
+  active boolean default true,
+  created_at timestamptz default now()
+);
+
+create table if not exists responses (
+  id text primary key,
+  questionnaire_id text references questionnaires(id) on delete cascade,
+  respondent_name text not null,
+  respondent_email text not null,
+  answers jsonb default '{}',
+  created_at timestamptz default now()
+);
+
+alter table questionnaires enable row level security;
+alter table responses enable row level security;
+
+create policy "public_read_q" on questionnaires for select using (true);
+create policy "admin_all_q" on questionnaires for all using (true);
+create policy "public_insert_r" on responses for insert with check (true);
+create policy "admin_read_r" on responses for select using (true);
+create policy "admin_delete_r" on responses for delete using (true);</pre>
+          <button class="btn btn-sm" onclick="copySQL()">📋 Copier le SQL</button>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Récupérer vos clés Supabase</div>
+          <div class="step-desc">Dans Supabase → <strong>Project Settings</strong> (icône engrenage) → <strong>API</strong><br>Copiez le <strong>Project URL</strong> et la clé <strong>anon public</strong>.</div>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Entrez vos informations</div>
+          <div class="fgroup"><label class="flabel">Project URL</label><input type="text" id="setup-url" placeholder="https://xxxxxxxxxxxxxxxx.supabase.co"></div>
+          <div class="fgroup"><label class="flabel">Anon Public Key</label><input type="text" id="setup-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."></div>
+          <div class="fgroup"><label class="flabel">Choisissez un mot de passe administrateur</label><input type="password" id="setup-pwd" placeholder="Minimum 6 caractères"></div>
+          <button class="btn btn-primary" onclick="finishSetup()">✓ Connecter et démarrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen" style="display:none">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-icon">E</div>
+      <div><div style="font-size:18px;font-weight:700">EvalPro</div><div style="font-size:12px;color:var(--text3)">Plateforme d'évaluation</div></div>
+    </div>
+    <div class="fgroup"><label class="flabel">Mot de passe administrateur</label><input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Accéder au tableau de bord</button>
+    <hr style="border:none;border-top:.5px solid var(--border);margin:1.5rem 0">
+    <div style="font-size:12px;color:var(--text3);margin-bottom:.5rem">Accéder à un questionnaire en tant que répondant :</div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="resp-code" placeholder="Code du questionnaire" style="font-size:13px;text-transform:uppercase">
+      <button class="btn btn-sm" onclick="openRespondentByCode()">Ouvrir →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN APP -->
+<div id="admin-app" style="display:none">
+  <div id="app">
+    <div id="sidebar">
+      <div class="sb-logo">
+        <div class="sb-icon">E</div>
+        <div><div class="sb-text">EvalPro</div><div class="sb-sub">Administration</div></div>
+      </div>
+      <nav class="sb-nav">
+        <div class="sb-sec">Principal</div>
+        <button class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')"><span class="nav-icon">📊</span> Tableau de bord</button>
+        <button class="nav-item" id="nav-questionnaires" onclick="navigate('questionnaires')"><span class="nav-icon">📋</span> Questionnaires<span class="nav-badge" id="nb-q">0</span></button>
+        <button class="nav-item" id="nav-responses" onclick="navigate('responses')"><span class="nav-icon">📥</span> Réponses<span class="nav-badge" id="nb-r">0</span></button>
+        <div class="sb-sec" style="margin-top:.5rem">Paramètres</div>
+        <button class="nav-item" id="nav-settings" onclick="navigate('settings')"><span class="nav-icon">⚙️</span> Paramètres</button>
+        <button class="nav-item" onclick="doLogout()"><span class="nav-icon">🚪</span> Déconnexion</button>
+      </nav>
+      <div class="sb-footer">
+        <div class="sb-uname">Administrateur</div>
+        <div class="sb-uinfo">EvalPro · Supabase ☁️</div>
+      </div>
+    </div>
+    <div id="main">
+      <div id="topbar"><div class="tb-title" id="tb-title">Tableau de bord</div><div class="tb-actions" id="tb-actions"></div></div>
+      <div id="content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- RESPONDENT APP -->
+<div id="respondent-app" style="display:none">
+  <div class="r-header">
+    <div style="font-size:14px;font-weight:600" id="r-title">Questionnaire</div>
+    <div style="font-size:12px;color:var(--text3)" id="r-sub"></div>
+  </div>
+  <div class="r-content" id="r-content"></div>
+</div>
+
+<!-- MODAL: créer/éditer questionnaire -->
+<div class="modal-overlay" id="modal-q">
+  <div class="modal modal-xl">
+    <div class="mhdr">
+      <div><div class="mtitle" id="mq-title">Nouveau questionnaire</div><div class="msub">Configurez et ajoutez vos questions</div></div>
+      <button class="close-btn" onclick="closeModal('modal-q')">✕</button>
+    </div>
+    <div class="frow2" style="margin-bottom:1rem">
+      <div class="fgroup" style="margin-bottom:0"><label class="flabel">Titre *</label><input type="text" id="q-title" placeholder="Ex: Étude de cas Chapitre 1"></div>
+      <div class="fgroup" style="margin-bottom:0"><label class="flabel">Type</label>
+        <select id="q-type">
+          <option value="mixed">Mixte</option><option value="table">Tableau d'analyse</option>
+          <option value="quiz">Quiz / QCM</option><option value="survey">Enquête</option><option value="eval">Évaluation</option>
+        </select>
+      </div>
+    </div>
+    <div class="fgroup"><label class="flabel">Description / consignes</label><textarea id="q-desc" rows="2" placeholder="Instructions pour les répondants..."></textarea></div>
+    <div class="fgroup"><label class="flabel">Texte de référence (affiché en lecture seule aux répondants)</label><textarea id="q-ref" rows="4" placeholder="Collez ici le texte de l'étude de cas ou le document à analyser..."></textarea></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+      <div class="sec-title" style="margin-bottom:0">Questions <span id="q-count-lbl" style="font-weight:400;text-transform:none;font-size:11px"></span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="addQ('text')">+ Texte libre</button>
+        <button class="btn btn-sm" onclick="addQ('qcm')">+ QCM</button>
+        <button class="btn btn-sm" onclick="addQ('checkbox')">+ Cases à cocher</button>
+        <button class="btn btn-sm" onclick="addQ('scale')">+ Échelle</button>
+        <button class="btn btn-sm" onclick="addQ('table')">+ Tableau analyse</button>
+        <button class="btn btn-sm" onclick="addQ('yesno')">+ Oui/Non</button>
+      </div>
+    </div>
+    <div id="q-builder" style="max-height:320px;overflow-y:auto;padding-right:4px"></div>
+    <div id="builder-empty" style="text-align:center;padding:1.25rem;color:var(--text3);font-size:13px;background:var(--bg2);border-radius:var(--r)">Ajoutez des questions via les boutons ci-dessus.</div>
+    <div class="mactions">
+      <button class="btn" onclick="closeModal('modal-q')">Annuler</button>
+      <button class="btn btn-primary" id="save-q-btn" onclick="saveQuestionnaire()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: réponses -->
+<div class="modal-overlay" id="modal-resp">
+  <div class="modal modal-xl">
+    <div class="mhdr">
+      <div><div class="mtitle" id="mr-title">Réponses</div><div class="msub" id="mr-sub"></div></div>
+      <button class="close-btn" onclick="closeModal('modal-resp')">✕</button>
+    </div>
+    <div id="mr-content" style="max-height:560px;overflow-y:auto"></div>
+    <div class="mactions">
+      <button class="btn" onclick="closeModal('modal-resp')">Fermer</button>
+      <button class="btn btn-sm" id="mr-export-btn">⬇ Exporter CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: partager -->
+<div class="modal-overlay" id="modal-share">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Partager le questionnaire</div><button class="close-btn" onclick="closeModal('modal-share')">✕</button></div>
+    <div class="fgroup">
+      <label class="flabel">Lien à envoyer aux répondants</label>
+      <div style="display:flex;gap:8px"><div class="copy-link" id="share-link"></div><button class="btn btn-sm" onclick="copyLink()">📋 Copier</button></div>
+      <div class="fhint">Les répondants n'ont pas besoin de compte. Envoyez ce lien par email ou WhatsApp.</div>
+    </div>
+    <div class="fgroup"><label class="flabel">Code court</label>
+      <div style="font-size:24px;font-weight:700;letter-spacing:5px;background:var(--bg2);border-radius:var(--r);padding:12px 16px;display:inline-block" id="share-code"></div>
+    </div>
+    <div class="mactions"><button class="btn btn-primary" onclick="closeModal('modal-share')">OK</button></div>
+  </div>
+</div>
+
+<!-- MODAL: mot de passe -->
+<div class="modal-overlay" id="modal-pwd">
+  <div class="modal">
+    <div class="mhdr"><div class="mtitle">Changer le mot de passe</div><button class="close-btn" onclick="closeModal('modal-pwd')">✕</button></div>
+    <div class="fgroup"><label class="flabel">Nouveau mot de passe</label><input type="password" id="new-pwd" placeholder="Min. 6 caractères"></div>
+    <div class="fgroup"><label class="flabel">Confirmer</label><input type="password" id="confirm-pwd" placeholder="Répétez..."></div>
+    <div class="mactions"><button class="btn" onclick="closeModal('modal-pwd')">Annuler</button><button class="btn btn-primary" onclick="savePwd()">Enregistrer</button></div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────
+const K_URL='ep_supa_url', K_KEY='ep_supa_key', K_PWD='ep_pwd';
+let SB=null;
+const gc=k=>localStorage.getItem(k)||'';
+const sc=(k,v)=>localStorage.setItem(k,v);
+
+// ─── UTILS ────────────────────────────────────────────
+const uid=()=>Math.random().toString(36).slice(2,9).toUpperCase();
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt=d=>new Date(d).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+let _tt;
+function toast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type;t.style.display='block';clearTimeout(_tt);_tt=setTimeout(()=>t.style.display='none',3500);}
+const openModal=id=>document.getElementById(id).classList.add('open');
+const closeModal=id=>document.getElementById(id).classList.remove('open');
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+const showLov=msg=>{document.getElementById('lov').style.display='flex';document.getElementById('lov-msg').textContent=msg||'Chargement...';}
+const hideLov=()=>document.getElementById('lov').style.display='none';
+const loading=html=>`<div style="text-align:center;padding:3rem"><div class="big-spinner" style="margin:0 auto"></div>${html?`<div style="margin-top:1rem;font-size:13px;color:var(--text3)">${html}</div>`:''}</div>`;
+
+// ─── INIT ─────────────────────────────────────────────
+async function init(){
+  const url=gc(K_URL), key=gc(K_KEY);
+  const code=new URLSearchParams(window.location.search).get('q');
+  if(!url||!key){hideLov();document.getElementById('setup-screen').style.display='block';return;}
+  try{
+    SB=window.supabase.createClient(url,key);
+    const {error}=await SB.from('questionnaires').select('id').limit(1);
+    if(error)throw error;
+    hideLov();
+    if(code){await loadRespondentByCode(code);return;}
+    document.getElementById('login-screen').style.display='flex';
+  }catch(e){hideLov();document.getElementById('setup-screen').style.display='block';toast('Erreur de connexion. Vérifiez vos clés Supabase.','error');}
+}
+
+function copySQL(){
+  const txt=document.getElementById('sql-block').textContent;
+  navigator.clipboard.writeText(txt).then(()=>toast('SQL copié !')).catch(()=>{const el=document.createElement('textarea');el.value=txt;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);toast('SQL copié !');});
+}
+
+async function finishSetup(){
+  const url=document.getElementById('setup-url').value.trim();
+  const key=document.getElementById('setup-key').value.trim();
+  const pwd=document.getElementById('setup-pwd').value;
+  if(!url||!key){toast('URL et clé Supabase obligatoires.','error');return;}
+  if(!pwd||pwd.length<6){toast('Mot de passe : minimum 6 caractères.','error');return;}
+  showLov('Test de connexion...');
+  try{
+    const client=window.supabase.createClient(url,key);
+    const {error}=await client.from('questionnaires').select('id').limit(1);
+    if(error)throw error;
+    sc(K_URL,url);sc(K_KEY,key);sc(K_PWD,pwd);SB=client;
+    hideLov();document.getElementById('setup-screen').style.display='none';document.getElementById('login-screen').style.display='flex';
+    toast('Connexion réussie ! Connectez-vous maintenant.');
+  }catch(e){hideLov();toast('Connexion échouée. Vérifiez l\'URL, la clé et que le SQL a été exécuté.','error');}
+}
+
+// ─── AUTH ─────────────────────────────────────────────
+function doLogin(){
+  if(document.getElementById('login-pwd').value===gc(K_PWD)){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('admin-app').style.display='block';
+    navigate('dashboard');
+  }else{toast('Mot de passe incorrect.','error');document.getElementById('login-pwd').value='';}
+}
+function doLogout(){document.getElementById('admin-app').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('login-pwd').value='';}
+function savePwd(){
+  const np=document.getElementById('new-pwd').value, cp=document.getElementById('confirm-pwd').value;
+  if(!np||np.length<6){toast('Min. 6 caractères.','error');return;}
+  if(np!==cp){toast('Les mots de passe ne correspondent pas.','error');return;}
+  sc(K_PWD,np);closeModal('modal-pwd');toast('Mot de passe mis à jour.');
+}
+
+// ─── NAVIGATION ───────────────────────────────────────
+function navigate(view){
+  ['dashboard','questionnaires','responses','settings'].forEach(v=>{const el=document.getElementById('nav-'+v);if(el)el.className='nav-item'+(v===view?' active':'');});
+  ({dashboard:renderDashboard,questionnaires:renderQuestionnaires,responses:renderResponses,settings:renderSettings})[view]?.();
+}
+async function updateBadges(){
+  const[{data:qs},{data:rs}]=await Promise.all([SB.from('questionnaires').select('id'),SB.from('responses').select('id')]);
+  document.getElementById('nb-q').textContent=(qs||[]).length;
+  document.getElementById('nb-r').textContent=(rs||[]).length;
+}
+
+// ─── TYPE MAPS ────────────────────────────────────────
+const TC={table:'bg-blue',quiz:'bg-amber',survey:'bg-green',eval:'bg-purple',mixed:'bg-teal'};
+const TL={table:'Tableau analyse',quiz:'Quiz / QCM',survey:'Enquête',eval:'Évaluation',mixed:'Mixte'};
+
+// ─── DASHBOARD ────────────────────────────────────────
+async function renderDashboard(){
+  document.getElementById('tb-title').textContent='Tableau de bord';
+  document.getElementById('tb-actions').innerHTML=`<button class="btn btn-primary btn-sm" onclick="openQModal()">+ Nouveau questionnaire</button>`;
+  document.getElementById('content').innerHTML=loading();
+  const[{data:qs},{data:rs}]=await Promise.all([SB.from('questionnaires').select('*').order('created_at',{ascending:false}),SB.from('responses').select('*').order('created_at',{ascending:false})]);
+  updateBadges();
+  const todayRs=(rs||[]).filter(r=>new Date(r.created_at).toDateString()===new Date().toDateString()).length;
+  document.getElementById('content').innerHTML=`
+    <div class="pg-title">Bonjour 👋</div><div class="pg-sub">Aperçu en temps réel de votre activité EvalPro.</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-lbl">Questionnaires</div><div class="stat-val">${(qs||[]).length}</div><div class="stat-sub">créés au total</div></div>
+      <div class="stat-card"><div class="stat-lbl">Réponses totales</div><div class="stat-val">${(rs||[]).length}</div><div class="stat-sub">soumissions reçues</div></div>
+      <div class="stat-card"><div class="stat-lbl">Aujourd'hui</div><div class="stat-val">${todayRs}</div><div class="stat-sub">nouvelles réponses</div></div>
+      <div class="stat-card"><div class="stat-lbl">Questionnaires actifs</div><div class="stat-val">${(qs||[]).filter(q=>q.active).length}</div><div class="stat-sub">acceptent des réponses</div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div class="sec-title" style="margin-bottom:0">Questionnaires récents</div>
+        <button class="btn btn-sm" onclick="navigate('questionnaires')">Voir tous →</button>
+      </div>
+      ${!(qs||[]).length?`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Aucun questionnaire</div><div class="empty-sub">Créez votre premier questionnaire pour commencer.</div><br><button class="btn btn-primary" onclick="openQModal()">+ Créer</button></div>`
+      :`<table class="dtbl"><thead><tr><th>Titre</th><th>Type</th><th>Réponses</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
+      ${(qs||[]).slice(0,5).map(q=>{const qrs=(rs||[]).filter(r=>r.questionnaire_id===q.id).length;return`<tr>
+        <td><strong style="font-size:13px">${esc(q.title)}</strong><br><span style="font-size:11px;color:var(--text3)">${fmt(q.created_at)}</span></td>
+        <td><span class="badge ${TC[q.type]||'bg-gray'}">${TL[q.type]||q.type}</span></td>
+        <td><button class="btn btn-xs" onclick="viewResponses('${q.id}')">${qrs}</button></td>
+        <td><span class="badge ${q.active?'bg-green':'bg-gray'}">${q.active?'Actif':'Inactif'}</span></td>
+        <td><div style="display:flex;gap:4px"><button class="btn btn-xs" onclick="shareQ('${q.id}','${q.code}')">🔗</button><button class="btn btn-xs" onclick="viewResponses('${q.id}')">📥</button></div></td>
+      </tr>`}).join('')}</tbody></table>`}
+    </div>
+    ${(rs||[]).length?`<div class="card"><div class="sec-title">Dernières réponses</div>${(rs||[]).slice(0,5).map(r=>{const q=(qs||[]).find(x=>x.id===r.questionnaire_id);return`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:.5px solid var(--border)"><div><strong style="font-size:13px">${esc(r.respondent_name)}</strong> <span style="font-size:12px;color:var(--text3)">${esc(r.respondent_email)}</span><br><span style="font-size:11px;color:var(--text3)">${q?esc(q.title):'?'} — ${fmt(r.created_at)}</span></div><button class="btn btn-xs" onclick="viewResponses('${r.questionnaire_id}')">Voir</button></div>`}).join('')}</div>`:''}`;
+}
+
+// ─── QUESTIONNAIRES ───────────────────────────────────
+async function renderQuestionnaires(){
+  document.getElementById('tb-title').textContent='Questionnaires';
+  document.getElementById('tb-actions').innerHTML=`<button class="btn btn-primary btn-sm" onclick="openQModal()">+ Nouveau questionnaire</button>`;
+  document.getElementById('content').innerHTML=loading();
+  const[{data:qs},{data:rs}]=await Promise.all([SB.from('questionnaires').select('*').order('created_at',{ascending:false}),SB.from('responses').select('questionnaire_id')]);
+  updateBadges();
+  document.getElementById('content').innerHTML=`
+    <div class="pg-title">Questionnaires</div><div class="pg-sub">Créez, gérez et partagez vos questionnaires d'évaluation.</div>
+    ${!(qs||[]).length?`<div class="card"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Aucun questionnaire</div><div class="empty-sub">Créez votre premier questionnaire.</div><br><button class="btn btn-primary" onclick="openQModal()">+ Créer un questionnaire</button></div></div>`
+    :`<div class="card" style="padding:0"><table class="dtbl"><thead><tr><th>Titre</th><th>Type</th><th>Questions</th><th>Réponses</th><th>Créé le</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
+    ${(qs||[]).map(q=>{const qrs=(rs||[]).filter(r=>r.questionnaire_id===q.id).length;return`<tr>
+      <td><div style="font-weight:500;font-size:13px">${esc(q.title)}</div>${q.description?`<div style="font-size:11px;color:var(--text3)">${esc(q.description.slice(0,60))}${q.description.length>60?'...':''}</div>`:''}</td>
+      <td><span class="badge ${TC[q.type]||'bg-gray'}">${TL[q.type]||q.type}</span></td>
+      <td>${(q.questions||[]).length}</td>
+      <td><button class="btn btn-xs" onclick="viewResponses('${q.id}')">${qrs}</button></td>
+      <td style="font-size:12px;color:var(--text3)">${fmt(q.created_at)}</td>
+      <td><span class="badge ${q.active?'bg-green':'bg-gray'}" style="cursor:pointer" onclick="toggleActive('${q.id}',${!q.active})">${q.active?'✓ Actif':'⏸ Inactif'}</span></td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-xs" onclick="shareQ('${q.id}','${q.code}')">🔗</button>
+        <button class="btn btn-xs" onclick="editQ('${q.id}')">✏️</button>
+        <button class="btn btn-xs btn-danger" onclick="deleteQ('${q.id}')">🗑</button>
+      </div></td>
+    </tr>`}).join('')}</tbody></table></div>`}`;
+}
+
+async function toggleActive(id,val){await SB.from('questionnaires').update({active:val}).eq('id',id);renderQuestionnaires();}
+async function deleteQ(id){
+  if(!confirm('Supprimer ce questionnaire et toutes ses réponses ?'))return;
+  await SB.from('questionnaires').delete().eq('id',id);
+  renderQuestionnaires();toast('Questionnaire supprimé.');
+}
+function shareQ(id,code){
+  const url=window.location.href.split('?')[0]+'?q='+code;
+  document.getElementById('share-link').textContent=url;
+  document.getElementById('share-code').textContent=code;
+  openModal('modal-share');
+}
+function copyLink(){
+  const txt=document.getElementById('share-link').textContent;
+  navigator.clipboard.writeText(txt).then(()=>toast('Lien copié !')).catch(()=>{const el=document.createElement('textarea');el.value=txt;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);toast('Lien copié !');});
+}
+
+// ─── BUILDER ──────────────────────────────────────────
+let eQId=null, bQs=[];
+const BTBC={text:'bg-gray',qcm:'bg-amber',checkbox:'bg-purple',scale:'bg-blue',table:'bg-teal',yesno:'bg-green'};
+const BTL={text:'Texte libre',qcm:'QCM',checkbox:'Cases à cocher',scale:'Échelle',table:'Tableau',yesno:'Oui/Non'};
+
+function openQModal(qid){
+  eQId=qid||null;bQs=[];
+  document.getElementById('mq-title').textContent=qid?'Modifier':'Nouveau questionnaire';
+  ['q-title','q-desc','q-ref'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('q-type').value='mixed';
+  document.getElementById('q-builder').innerHTML='';
+  if(!qid){updateBEmpty();openModal('modal-q');return;}
+  SB.from('questionnaires').select('*').eq('id',qid).single().then(({data:q})=>{
+    if(q){document.getElementById('q-title').value=q.title;document.getElementById('q-desc').value=q.description||'';document.getElementById('q-ref').value=q.ref_text||'';document.getElementById('q-type').value=q.type;bQs=JSON.parse(JSON.stringify(q.questions||[]));renderBuild();}
+    openModal('modal-q');
+  });
+}
+const editQ=id=>openQModal(id);
+
+function addQ(type){
+  const q={id:uid(),type,required:true,label:''};
+  if(type==='text')q.placeholder='';
+  if(type==='qcm'||type==='checkbox')q.options=['Option A','Option B','Option C'];
+  if(type==='scale'){q.min=1;q.max=5;q.minLabel='';q.maxLabel='';}
+  if(type==='table'){q.columns=['Sous-chapitre ou NA','N° Exigences ou NA','C / NC / NA'];q.rows=[''];}
+  bQs.push(q);renderBuild();
+}
+
+function renderBuild(){
+  document.getElementById('q-builder').innerHTML=bQs.map((q,i)=>`
+    <div class="q-block">
+      <div class="q-bhdr">
+        <div class="q-num">${i+1}</div>
+        <span class="badge ${BTBC[q.type]||'bg-gray'}">${BTL[q.type]||q.type}</span>
+        <div class="q-bactions">
+          ${i>0?`<button class="btn-icon" onclick="mvQ('${q.id}',-1)">↑</button>`:''}
+          ${i<bQs.length-1?`<button class="btn-icon" onclick="mvQ('${q.id}',1)">↓</button>`:''}
+          <button class="btn-icon btn-danger" onclick="rmQ('${q.id}')">✕</button>
+        </div>
+      </div>
+      <div class="fgroup" style="margin-bottom:.5rem"><input type="text" placeholder="Libellé de la question *" value="${esc(q.label||'')}" oninput="uQ('${q.id}','label',this.value)" style="font-weight:500"></div>
+      ${buildBody(q)}
+      <label style="display:flex;align-items:center;gap:8px;margin-top:.5rem;font-size:12px;color:var(--text2);cursor:pointer"><input type="checkbox" ${q.required?'checked':''} onchange="uQ('${q.id}','required',this.checked)"> Obligatoire</label>
+    </div>`).join('');
+  updateBEmpty();
+  document.getElementById('q-count-lbl').textContent=bQs.length?`(${bQs.length})`:'';
+}
+
+function buildBody(q){
+  if(q.type==='text')return`<textarea placeholder="Placeholder (optionnel)" rows="2" oninput="uQ('${q.id}','placeholder',this.value)">${esc(q.placeholder||'')}</textarea>`;
+  if(q.type==='qcm'||q.type==='checkbox'){
+    const ic=q.type==='qcm'?'<div class="opt-dot"></div>':'<div class="opt-sq"></div>';
+    return`<div>${q.options.map((o,oi)=>`<div class="opt-row">${ic}<input type="text" value="${esc(o)}" oninput="uOpt('${q.id}',${oi},this.value)" placeholder="Option ${oi+1}"><button class="btn-icon" onclick="rmOpt('${q.id}',${oi})">✕</button></div>`).join('')}</div><button class="btn btn-xs" style="margin-top:4px" onclick="addOpt('${q.id}')">+ Option</button>`;
+  }
+  if(q.type==='scale')return`
+    <div class="frow3" style="margin-top:.25rem">
+      <div><label class="flabel" style="font-size:11px">Min</label><input type="number" value="${q.min}" min="0" max="10" oninput="uQ('${q.id}','min',+this.value)"></div>
+      <div><label class="flabel" style="font-size:11px">Max</label><input type="number" value="${q.max}" min="1" max="10" oninput="uQ('${q.id}','max',+this.value)"></div><div></div>
+    </div>
+    <div class="frow2" style="margin-top:.25rem">
+      <div><label class="flabel" style="font-size:11px">Étiquette min</label><input type="text" value="${esc(q.minLabel||'')}" placeholder="Ex: Pas du tout" oninput="uQ('${q.id}','minLabel',this.value)"></div>
+      <div><label class="flabel" style="font-size:11px">Étiquette max</label><input type="text" value="${esc(q.maxLabel||'')}" placeholder="Ex: Tout à fait" oninput="uQ('${q.id}','maxLabel',this.value)"></div>
+    </div>`;
+  if(q.type==='yesno')return`<div style="font-size:12px;color:var(--text3);margin-top:.25rem">Le répondant choisira : Oui / Non / Sans avis</div>`;
+  if(q.type==='table')return`
+    <div style="margin-top:.5rem">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Colonnes :</div>
+      ${q.columns.map((c,ci)=>`<div class="opt-row"><input type="text" value="${esc(c)}" oninput="uCol('${q.id}',${ci},this.value)"><button class="btn-icon" onclick="rmCol('${q.id}',${ci})">✕</button></div>`).join('')}
+      <button class="btn btn-xs" onclick="addCol('${q.id}')">+ Colonne</button>
+    </div>
+    <div style="margin-top:.75rem">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Lignes préremplies (vide = saisie libre) :</div>
+      ${q.rows.map((r,ri)=>`<div class="opt-row"><input type="text" value="${esc(r)}" oninput="uRow('${q.id}',${ri},this.value)" placeholder="Phrase ${ri+1}"><button class="btn-icon" onclick="rmRow('${q.id}',${ri})">✕</button></div>`).join('')}
+      <button class="btn btn-xs" onclick="addRow2('${q.id}')">+ Ligne</button>
+    </div>`;
+  return'';
+}
+
+const updateBEmpty=()=>{const e=document.getElementById('builder-empty');if(e)e.style.display=bQs.length===0?'block':'none';};
+const uQ=(qid,k,v)=>{const q=bQs.find(x=>x.id===qid);if(q)q[k]=v;};
+const uOpt=(qid,oi,v)=>{const q=bQs.find(x=>x.id===qid);if(q)q.options[oi]=v;};
+const addOpt=qid=>{const q=bQs.find(x=>x.id===qid);if(q){q.options.push('');renderBuild();}};
+const rmOpt=(qid,oi)=>{const q=bQs.find(x=>x.id===qid);if(q&&q.options.length>1){q.options.splice(oi,1);renderBuild();}};
+const uCol=(qid,ci,v)=>{const q=bQs.find(x=>x.id===qid);if(q)q.columns[ci]=v;};
+const addCol=qid=>{const q=bQs.find(x=>x.id===qid);if(q){q.columns.push('Colonne');renderBuild();}};
+const rmCol=(qid,ci)=>{const q=bQs.find(x=>x.id===qid);if(q&&q.columns.length>1){q.columns.splice(ci,1);renderBuild();}};
+const uRow=(qid,ri,v)=>{const q=bQs.find(x=>x.id===qid);if(q)q.rows[ri]=v;};
+const addRow2=qid=>{const q=bQs.find(x=>x.id===qid);if(q){q.rows.push('');renderBuild();}};
+const rmRow=(qid,ri)=>{const q=bQs.find(x=>x.id===qid);if(q&&q.rows.length>1){q.rows.splice(ri,1);renderBuild();}};
+const rmQ=qid=>{bQs=bQs.filter(x=>x.id!==qid);renderBuild();};
+const mvQ=(qid,d)=>{const i=bQs.findIndex(x=>x.id===qid),ni=i+d;if(ni<0||ni>=bQs.length)return;[bQs[i],bQs[ni]]=[bQs[ni],bQs[i]];renderBuild();};
+
+async function saveQuestionnaire(){
+  const title=document.getElementById('q-title').value.trim();
+  if(!title){toast('Titre obligatoire.','error');return;}
+  const btn=document.getElementById('save-q-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Enregistrement...';
+  const payload={title,description:document.getElementById('q-desc').value.trim(),ref_text:document.getElementById('q-ref').value.trim(),type:document.getElementById('q-type').value,questions:JSON.parse(JSON.stringify(bQs))};
+  const{error}=eQId
+    ? await SB.from('questionnaires').update(payload).eq('id',eQId)
+    : await SB.from('questionnaires').insert({...payload,id:uid(),code:uid().slice(0,6),active:true});
+  btn.disabled=false;btn.innerHTML='💾 Enregistrer';
+  if(error){toast('Erreur: '+error.message,'error');return;}
+  closeModal('modal-q');renderQuestionnaires();toast(eQId?'Questionnaire mis à jour.':'Questionnaire créé !');
+}
+
+// ─── RESPONSES ────────────────────────────────────────
+async function renderResponses(){
+  document.getElementById('tb-title').textContent='Réponses';
+  document.getElementById('tb-actions').innerHTML=`<button class="btn btn-sm" onclick="exportAllCSV()">⬇ Exporter tout</button>`;
+  document.getElementById('content').innerHTML=loading();
+  const[{data:rs},{data:qs}]=await Promise.all([SB.from('responses').select('*').order('created_at',{ascending:false}),SB.from('questionnaires').select('id,title')]);
+  updateBadges();
+  document.getElementById('content').innerHTML=`
+    <div class="pg-title">Réponses reçues</div><div class="pg-sub">Toutes les soumissions — synchronisées en temps réel depuis Supabase.</div>
+    ${!(rs||[]).length?`<div class="card"><div class="empty"><div class="empty-icon">📥</div><div class="empty-title">Aucune réponse</div><div class="empty-sub">Partagez vos questionnaires pour recevoir des réponses.</div></div></div>`
+    :`<div>${(rs||[]).map(r=>{const q=(qs||[]).find(x=>x.id===r.questionnaire_id);return`<div class="resp-item"><div class="resp-meta"><div><div style="font-weight:500;font-size:14px">${esc(r.respondent_name)}</div><div style="font-size:12px;color:var(--text2)">${esc(r.respondent_email)}</div><div style="font-size:11px;color:var(--text3);margin-top:3px">${q?esc(q.title):'?'} — ${fmt(r.created_at)}</div></div><div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="viewResponses('${r.questionnaire_id}')">Voir</button><button class="btn btn-xs btn-danger" onclick="delResp('${r.id}')">🗑</button></div></div></div>`;}).join('')}</div>`}`;
+}
+
+async function delResp(id){
+  if(!confirm('Supprimer cette réponse ?'))return;
+  await SB.from('responses').delete().eq('id',id);
+  renderResponses();toast('Réponse supprimée.');
+}
+
+async function viewResponses(qid){
+  openModal('modal-resp');
+  document.getElementById('mr-content').innerHTML=loading();
+  const[{data:q},{data:rs}]=await Promise.all([SB.from('questionnaires').select('*').eq('id',qid).single(),SB.from('responses').select('*').eq('questionnaire_id',qid).order('created_at',{ascending:false})]);
+  if(!q){toast('Questionnaire introuvable.','error');return;}
+  document.getElementById('mr-title').textContent=q.title;
+  document.getElementById('mr-sub').textContent=(rs||[]).length+' réponse'+((rs||[]).length>1?'s':'')+' reçue'+((rs||[]).length>1?'s':'');
+  document.getElementById('mr-export-btn').onclick=()=>exportQCSV(q,rs||[]);
+  if(!(rs||[]).length){document.getElementById('mr-content').innerHTML='<div class="empty" style="padding:2rem"><div class="empty-icon">📥</div><div class="empty-title">Aucune réponse pour ce questionnaire</div></div>';return;}
+  document.getElementById('mr-content').innerHTML=(rs||[]).map(r=>{
+    const ahtml=(q.questions||[]).map(qq=>{
+      const ans=(r.answers||{})[qq.id];
+      if(qq.type==='table'){
+        if(!ans||!ans.rows)return'';
+        const filled=ans.rows.filter(row=>row.phrase||(qq.columns||[]).some((_,ci)=>row.cols&&row.cols[ci]));
+        return`<div class="ans-blk"><div class="ans-q">${esc(qq.label||'Tableau')}</div><table class="rtbl"><thead><tr><th>Phrase</th>${(qq.columns||[]).map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${filled.map(row=>`<tr><td>${esc(row.phrase)}</td>${(qq.columns||[]).map((_,ci)=>`<td>${esc((row.cols&&row.cols[ci])||'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      }
+      if(qq.type==='checkbox')return`<div class="ans-blk"><div class="ans-q">${esc(qq.label)}</div><div class="ans-a">${Array.isArray(ans)?ans.map(a=>esc(a)).join(', '):(esc(ans)||'—')}</div></div>`;
+      return`<div class="ans-blk"><div class="ans-q">${esc(qq.label)}</div><div class="ans-a">${esc(String(ans||'—'))}</div></div>`;
+    }).join('');
+    return`<div class="resp-item"><div class="resp-meta"><div><div style="font-weight:500;font-size:14px">${esc(r.respondent_name)}</div><div style="font-size:12px;color:var(--text2)">${esc(r.respondent_email)} — ${fmt(r.created_at)}</div></div><button class="btn btn-xs btn-danger" onclick="delResp('${r.id}');viewResponses('${qid}')">🗑</button></div>${ahtml}</div>`;
+  }).join('');
+}
+
+function exportQCSV(q,rs){
+  const h=['Nom','Email','Date'];
+  (q.questions||[]).forEach(qq=>{if(qq.type==='table'){h.push('Phrase');(qq.columns||[]).forEach(c=>h.push(c));}else h.push(qq.label||qq.type);});
+  const rows=[h];
+  rs.forEach(r=>{
+    const base=[r.respondent_name,r.respondent_email,fmt(r.created_at)];
+    let maxR=1;
+    (q.questions||[]).forEach(qq=>{const ans=(r.answers||{})[qq.id];if(qq.type==='table'&&ans&&ans.rows)maxR=Math.max(maxR,ans.rows.length);});
+    for(let ri=0;ri<maxR;ri++){
+      const row=ri===0?[...base]:['','',''];
+      (q.questions||[]).forEach(qq=>{const ans=(r.answers||{})[qq.id];if(qq.type==='table'){const tr=(ans&&ans.rows&&ans.rows[ri])||{};row.push(tr.phrase||'');(qq.columns||[]).forEach((_,ci)=>row.push((tr.cols&&tr.cols[ci])||''));}else if(ri===0)row.push(Array.isArray(ans)?ans.join(', '):String(ans||''));else row.push('');});
+      rows.push(row);
+    }
+  });
+  dlCSV(rows,'reponses_'+q.title.replace(/\s+/g,'_').slice(0,30)+'_'+new Date().toISOString().slice(0,10));
+}
+
+async function exportAllCSV(){
+  const[{data:qs},{data:rs}]=await Promise.all([SB.from('questionnaires').select('*'),SB.from('responses').select('*')]);
+  if(!(rs||[]).length){toast('Aucune réponse.','error');return;}
+  const rows=[['Questionnaire','Nom','Email','Date','Question','Réponse']];
+  (rs||[]).forEach(r=>{const q=(qs||[]).find(x=>x.id===r.questionnaire_id);(q?q.questions:[]).forEach(qq=>{const ans=(r.answers||{})[qq.id];if(qq.type==='table'&&ans&&ans.rows){ans.rows.forEach(tr=>rows.push([q.title,r.respondent_name,r.respondent_email,fmt(r.created_at),qq.label||'Tableau',[tr.phrase,...(qq.columns||[]).map((_,ci)=>(tr.cols&&tr.cols[ci])||'')].join(' | ')]));}else rows.push([q?q.title:'?',r.respondent_name,r.respondent_email,fmt(r.created_at),qq.label||qq.type,Array.isArray(ans)?ans.join(', '):String(ans||'')]);});});
+  dlCSV(rows,'toutes_reponses_'+new Date().toISOString().slice(0,10));
+}
+
+function dlCSV(rows,name){
+  const csv=rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  toast('CSV exporté.');
+}
+
+// ─── SETTINGS ─────────────────────────────────────────
+function renderSettings(){
+  document.getElementById('tb-title').textContent='Paramètres';
+  document.getElementById('tb-actions').innerHTML='';
+  document.getElementById('content').innerHTML=`
+    <div class="pg-title">Paramètres</div><div class="pg-sub">Configuration de EvalPro.</div>
+    <div class="card"><div class="sec-title">Connexion Supabase</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+        <div><div style="font-size:14px;font-weight:500">Base de données</div><div style="font-size:12px;color:var(--text3);font-family:monospace;margin-top:2px">${gc(K_URL)}</div></div>
+        <span class="badge bg-green">✓ Connecté</span>
+      </div>
+      <hr style="border:none;border-top:.5px solid var(--border);margin:.75rem 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+        <div><div style="font-size:14px;font-weight:500">Reconfigurer Supabase</div><div style="font-size:12px;color:var(--text2)">Changer les clés de connexion.</div></div>
+        <button class="btn btn-sm" onclick="if(confirm('Réinitialiser ?')){localStorage.removeItem('${K_URL}');localStorage.removeItem('${K_KEY}');location.reload();}">Réinitialiser</button>
+      </div>
+    </div>
+    <div class="card"><div class="sec-title">Sécurité</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+        <div><div style="font-size:14px;font-weight:500">Mot de passe administrateur</div></div>
+        <button class="btn btn-sm" onclick="openModal('modal-pwd')">🔑 Changer</button>
+      </div>
+    </div>
+    <div class="card"><div class="sec-title">Export</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+        <div><div style="font-size:14px;font-weight:500">Exporter toutes les réponses (CSV)</div></div>
+        <button class="btn btn-sm" onclick="exportAllCSV()">⬇ Exporter</button>
+      </div>
+    </div>`;
+}
+
+// ─── RESPONDENT ───────────────────────────────────────
+let curQ=null, rAns={};
+
+async function openRespondentByCode(){
+  const code=document.getElementById('resp-code').value.trim().toUpperCase();
+  if(!code){toast('Entrez un code.','error');return;}
+  await loadRespondentByCode(code);
+}
+
+async function loadRespondentByCode(code){
+  showLov('Chargement du questionnaire...');
+  const{data:q,error}=await SB.from('questionnaires').select('*').eq('code',code).single();
+  hideLov();
+  if(error||!q){toast('Code invalide ou questionnaire introuvable.','error');if(!document.getElementById('login-screen').style.display||document.getElementById('login-screen').style.display==='none')document.getElementById('login-screen').style.display='flex';return;}
+  if(!q.active){toast('Ce questionnaire n\'accepte plus de réponses.','info');document.getElementById('login-screen').style.display='flex';return;}
+  openRView(q);
+}
+
+function openRView(q){
+  curQ=q;rAns={};
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('admin-app').style.display='none';
+  document.getElementById('respondent-app').style.display='block';
+  document.getElementById('r-title').textContent=q.title;
+  renderRForm(q);
+}
+
+function renderRForm(q){
+  const qs=q.questions||[];
+  const refHtml=q.ref_text?`<div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.25rem 1.5rem;margin-bottom:1rem"><div class="sec-title">Texte de référence</div><div class="ref-box">${esc(q.ref_text)}</div><div style="font-size:11px;color:var(--text3)">Utilisez ce texte pour répondre aux questions ci-dessous.</div></div>`:'';
+  const descHtml=q.description?`<div style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:1.25rem;background:var(--bg);border-radius:var(--rl);border:.5px solid var(--border);padding:1rem 1.5rem">${esc(q.description)}</div>`:'';
+  document.getElementById('r-content').innerHTML=`
+    <div style="margin-bottom:1rem"><div style="font-size:20px;font-weight:600;margin-bottom:.25rem">${esc(q.title)}</div><div style="font-size:13px;color:var(--text3)">${qs.length} question${qs.length>1?'s':''} • Les champs * sont obligatoires</div></div>
+    ${descHtml}${refHtml}
+    <div class="q-card"><div class="sec-title">Vos informations</div>
+      <div class="frow2">
+        <div class="fgroup"><label class="flabel">Nom complet *</label><input type="text" id="r-name" placeholder="Jean Konan"></div>
+        <div class="fgroup"><label class="flabel">Email *</label><input type="email" id="r-email" placeholder="jean@exemple.com"></div>
+      </div>
+    </div>
+    ${qs.map((qq,i)=>renderRQ(qq,i)).join('')}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem">
+      <button class="btn" onclick="document.getElementById('respondent-app').style.display='none';document.getElementById('login-screen').style.display='flex'">← Retour</button>
+      <button class="btn btn-primary" id="submit-btn" onclick="submitR()" style="padding:10px 28px">✓ Envoyer mes réponses</button>
+    </div>`;
+}
+
+function renderRQ(qq,i){
+  const req=qq.required?'<span class="q-req">*</span>':'';
+  let body='';
+  if(qq.type==='text')body=`<textarea id="ans-${qq.id}" rows="4" placeholder="${esc(qq.placeholder||'Votre réponse...')}" oninput="rAns['${qq.id}']=this.value"></textarea>`;
+  else if(qq.type==='qcm')body=(qq.options||[]).map((o,oi)=>`<div class="r-opt" id="ro-${qq.id}-${oi}" onclick="selQCM('${qq.id}',${oi},'${esc(o)}')"><div class="opt-dot" id="dot-${qq.id}-${oi}" style="margin-top:1px;flex-shrink:0"></div><span>${esc(o)}</span></div>`).join('');
+  else if(qq.type==='checkbox'){body=(qq.options||[]).map((o,oi)=>`<div class="r-opt" id="co-${qq.id}-${oi}" onclick="togChk('${qq.id}',${oi},'${esc(o)}')"><div class="opt-sq" id="sq-${qq.id}-${oi}" style="margin-top:1px;flex-shrink:0"></div><span>${esc(o)}</span></div>`).join('');rAns[qq.id]=[];}
+  else if(qq.type==='yesno')body=`<div style="display:flex;gap:8px">${['Oui','Non','Sans avis'].map(v=>`<button class="btn" id="yn-${qq.id}-${v}" onclick="selYN('${qq.id}','${v}')" style="flex:1;justify-content:center">${v}</button>`).join('')}</div>`;
+  else if(qq.type==='scale'){const ns=[];for(let n=qq.min;n<=qq.max;n++)ns.push(n);body=`<div><div class="scale-row">${ns.map(n=>`<button class="scale-btn" id="sc-${qq.id}-${n}" onclick="selSc('${qq.id}',${n})">${n}</button>`).join('')}</div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:4px"><span>${esc(qq.minLabel||'')}</span><span>${esc(qq.maxLabel||'')}</span></div></div>`;}
+  else if(qq.type==='table'){
+    const cols=qq.columns||[];const rows=(qq.rows&&qq.rows.length)?qq.rows:[''];
+    rAns[qq.id]={rows:rows.map(r=>({phrase:r,cols:new Array(cols.length).fill('')}))};
+    const ta=(ri,ci,isPhrase)=>`<textarea placeholder="${isPhrase?'Saisissez la phrase...':'...'}" style="width:100%;min-height:48px;border:none;background:transparent;resize:vertical;padding:7px 10px;font-size:13px;font-family:inherit;color:var(--text);outline:none;" oninput="${isPhrase?`uTA('${qq.id}',${ri},'phrase',this.value)`:`uTA('${qq.id}',${ri},${ci},this.value)`}" onfocus="this.style.background='var(--bg2)'" onblur="this.style.background='transparent'"></textarea>`;
+    body=`<div style="overflow-x:auto"><table class="tqtbl"><thead><tr><th style="width:38%">Phrases ou groupes de mots</th>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody id="tbl-${qq.id}">${rows.map((r,ri)=>`<tr><td class="${r?'tq-phrase':''}" style="${r?'':'padding:0'}">${r?`<span>${esc(r)}</span>`:ta(ri,-1,true)}</td>${cols.map((_,ci)=>`<td style="padding:0;border:.5px solid var(--border2)">${ta(ri,ci,false)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <button class="btn btn-xs" style="margin-top:6px" onclick="addTRow('${qq.id}',${cols.length})">+ Ligne</button>`;
+  }
+  return`<div class="q-card" id="qcard-${qq.id}"><div class="q-lbl">${i+1}. ${esc(qq.label||'Question')}${req}</div>${body}</div>`;
+}
+
+const selQCM=(qid,oi,val)=>{rAns[qid]=val;document.querySelectorAll(`[id^="ro-${qid}-"]`).forEach((el,i)=>{el.className='r-opt'+(i===oi?' selected':'');const d=document.getElementById(`dot-${qid}-${i}`);if(d)d.style.background=i===oi?'var(--text)':'';});};
+const togChk=(qid,oi,val)=>{if(!Array.isArray(rAns[qid]))rAns[qid]=[];const ix=rAns[qid].indexOf(val);if(ix>=0)rAns[qid].splice(ix,1);else rAns[qid].push(val);const el=document.getElementById(`co-${qid}-${oi}`);const sq=document.getElementById(`sq-${qid}-${oi}`);if(el)el.className='r-opt'+(rAns[qid].includes(val)?' selected':'');if(sq)sq.style.background=rAns[qid].includes(val)?'var(--text)':'';};
+const selYN=(qid,val)=>{rAns[qid]=val;['Oui','Non','Sans avis'].forEach(v=>{const b=document.getElementById(`yn-${qid}-${v}`);if(b){b.style.background=v===val?'var(--text)':'';b.style.color=v===val?'var(--bg)':'';b.style.borderColor=v===val?'var(--text)':'';}}); };
+const selSc=(qid,val)=>{rAns[qid]=val;document.querySelectorAll(`[id^="sc-${qid}-"]`).forEach(el=>{const n=+el.id.split('-').pop();el.className='scale-btn'+(n===val?' selected':'');});};
+const uTA=(qid,ri,kci,val)=>{if(!rAns[qid])rAns[qid]={rows:[]};if(!rAns[qid].rows[ri])rAns[qid].rows[ri]={phrase:'',cols:[]};if(kci==='phrase')rAns[qid].rows[ri].phrase=val;else{if(!rAns[qid].rows[ri].cols)rAns[qid].rows[ri].cols=[];rAns[qid].rows[ri].cols[kci]=val;}};
+
+function addTRow(qid,colCount){
+  if(!rAns[qid])rAns[qid]={rows:[]};
+  const ri=rAns[qid].rows.length;rAns[qid].rows.push({phrase:'',cols:new Array(colCount).fill('')});
+  const tbody=document.getElementById(`tbl-${qid}`);if(!tbody)return;
+  const qq=curQ.questions.find(x=>x.id===qid);const cols=(qq&&qq.columns)||[];
+  const tr=document.createElement('tr');
+  const ta=(ri2,ci,isP)=>`<textarea placeholder="${isP?'Saisissez la phrase...':'...'}" style="width:100%;min-height:48px;border:none;background:transparent;resize:vertical;padding:7px 10px;font-size:13px;font-family:inherit;color:var(--text);outline:none;" oninput="${isP?`uTA('${qid}',${ri2},'phrase',this.value)`:`uTA('${qid}',${ri2},${ci},this.value)`}" onfocus="this.style.background='var(--bg2)'" onblur="this.style.background='transparent'"></textarea>`;
+  tr.innerHTML=`<td style="padding:0;border:.5px solid var(--border2)">${ta(ri,-1,true)}</td>${cols.map((_,ci)=>`<td style="padding:0;border:.5px solid var(--border2)">${ta(ri,ci,false)}</td>`).join('')}`;
+  tbody.appendChild(tr);
+}
+
+async function submitR(){
+  const name=document.getElementById('r-name').value.trim();
+  const email=document.getElementById('r-email').value.trim();
+  if(!name){toast('Veuillez entrer votre nom.','error');return;}
+  if(!email||!email.includes('@')){toast('Email invalide.','error');return;}
+  const missing=(curQ.questions||[]).filter(qq=>{
+    if(!qq.required)return false;
+    const ans=rAns[qq.id];
+    if(qq.type==='checkbox')return!ans||ans.length===0;
+    if(qq.type==='table')return!ans||!ans.rows||ans.rows.every(r=>!r.phrase&&(!r.cols||r.cols.every(c=>!c)));
+    return!ans&&ans!==0;
+  });
+  if(missing.length>0){missing.forEach(qq=>{const c=document.getElementById(`qcard-${qq.id}`);if(c){c.style.borderColor='var(--red-border)';setTimeout(()=>c.style.borderColor='',3000);}});toast(`${missing.length} question${missing.length>1?'s':''} obligatoire${missing.length>1?'s':''} sans réponse.`,'error');return;}
+  const btn=document.getElementById('submit-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Envoi...';
+  const{error}=await SB.from('responses').insert({id:uid(),questionnaire_id:curQ.id,respondent_name:name,respondent_email:email,answers:JSON.parse(JSON.stringify(rAns))});
+  if(error){btn.disabled=false;btn.innerHTML='✓ Envoyer mes réponses';toast('Erreur: '+error.message,'error');return;}
+  document.getElementById('r-content').innerHTML=`<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1.25rem">✅</div><div style="font-size:20px;font-weight:600;margin-bottom:.5rem">Réponses envoyées !</div><div style="font-size:14px;color:var(--text2);margin-bottom:2rem">Merci ${esc(name)}, vos réponses ont bien été enregistrées dans la base de données.</div><button class="btn" onclick="document.getElementById('respondent-app').style.display='none';document.getElementById('login-screen').style.display='flex'">← Retour à l'accueil</button></div>`;
+}
+
+init();
+</script>
+</body>
+</html>
