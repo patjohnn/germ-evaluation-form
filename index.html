@@ -424,7 +424,7 @@ async function init(){
     if(code){
       document.getElementById('respondent-app').style.display='block';
       document.getElementById('r-title').textContent='Questionnaire';
-      document.getElementById('r-content').innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">⚠️</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Questionnaire indisponible</div><div style="font-size:14px;color:#5f5e5a">Contactez l'administrateur.</div></div>';
+      document.getElementById('r-content').innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">&#x26A0;&#xFE0F;</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Questionnaire indisponible</div><div style="font-size:14px;color:#5f5e5a">Contactez l&#39;administrateur.</div></div>';
       return;
     }
     document.getElementById('setup-screen').style.display='block';
@@ -441,7 +441,7 @@ async function init(){
     hideLov();
     if(code){
       document.getElementById('respondent-app').style.display='block';
-      document.getElementById('r-content').innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">⚠️</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Erreur de connexion</div><div style="font-size:14px;color:#5f5e5a">Impossible de charger le questionnaire. Réessayez dans quelques instants.</div></div>';
+      document.getElementById('r-content').innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">&#x26A0;&#xFE0F;</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Erreur de connexion</div><div style="font-size:14px;color:#5f5e5a">Impossible de charger le questionnaire.</div></div>';
       return;
     }
     document.getElementById('setup-screen').style.display='block';
