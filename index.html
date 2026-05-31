@@ -900,8 +900,8 @@ async function viewResponses(qid){
           '</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;flex-direction:column;align-items:flex-end">'+
-          '<button class="btn btn-xs btn-success" onclick="saveGrade(''+r.id+'',''+qid+'')">&#128190; Enregistrer</button>'+
-          '<button class="btn btn-xs btn-danger" onclick="delResp(''+r.id+'');viewResponses(''+qid+'')">&#128465;</button>'+
+          '<button class="btn btn-xs btn-success" data-rid="'+r.id+'" data-qid="'+qid+'" onclick="saveGrade(this.dataset.rid,this.dataset.qid)">&#128190; Enregistrer</button>'+
+          '<button class="btn btn-xs btn-danger" data-rid="'+r.id+'" data-qid="'+qid+'" onclick="delResp(this.dataset.rid);viewResponses(this.dataset.qid)">&#128465;</button>'+
         '</div>'+
       '</div>'+
       qrows+
