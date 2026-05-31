@@ -390,10 +390,16 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────
+// ─── SUPABASE CONFIG ──────────────────────────────────
+// Ces valeurs sont définies une fois par l'admin dans l'écran de configuration
+// Elles sont ensuite stockées et partagées avec tous les visiteurs via le code
 const K_URL='ep_supa_url', K_KEY='ep_supa_key', K_PWD='ep_pwd';
 let SB=null;
 const gc=k=>localStorage.getItem(k)||'';
 const sc=(k,v)=>localStorage.setItem(k,v);
+// Clés hardcodées (remplies automatiquement après la config admin)
+const HARDCODED_URL='__SUPA_URL__';
+const HARDCODED_KEY='__SUPA_KEY__';
 
 // ─── UTILS ────────────────────────────────────────────
 const uid=()=>Math.random().toString(36).slice(2,9).toUpperCase();
@@ -411,9 +417,24 @@ const loading=html=>`<div style="text-align:center;padding:3rem"><div class="big
 
 // ─── INIT ─────────────────────────────────────────────
 async function init(){
-  const url=gc(K_URL), key=gc(K_KEY);
+  // Priorité: clés hardcodées > localStorage
+  const url = (HARDCODED_URL && HARDCODED_URL !== '__SUPA_URL__') ? HARDCODED_URL : gc(K_URL);
+  const key = (HARDCODED_KEY && HARDCODED_KEY !== '__SUPA_KEY__') ? HARDCODED_KEY : gc(K_KEY);
   const code=new URLSearchParams(window.location.search).get('q');
-  if(!url||!key){hideLov();document.getElementById('setup-screen').style.display='block';return;}
+
+  // Si pas de clés du tout → écran setup (admin seulement)
+  if(!url||!key){
+    hideLov();
+    // Si c'est un répondant avec un code → message d'erreur simple
+    if(code){
+      document.getElementById('lov').style.display='none';
+      document.getElementById('respondent-app').style.display='block';
+      document.getElementById('r-content').innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">⚠️</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Questionnaire indisponible</div><div style="font-size:14px;color:var(--text2)">Ce questionnaire n'est pas encore configuré. Contactez l'administrateur.</div></div>';
+      return;
+    }
+    document.getElementById('setup-screen').style.display='block';
+    return;
+  }
   try{
     SB=window.supabase.createClient(url,key);
     const {error}=await SB.from('questionnaires').select('id').limit(1);
@@ -421,7 +442,16 @@ async function init(){
     hideLov();
     if(code){await loadRespondentByCode(code);return;}
     document.getElementById('login-screen').style.display='flex';
-  }catch(e){hideLov();document.getElementById('setup-screen').style.display='block';toast('Erreur de connexion. Vérifiez vos clés Supabase.','error');}
+  }catch(e){
+    hideLov();
+    if(code){
+      document.getElementById('respondent-app').style.display='block';
+      document.getElementById('r-content').innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">⚠️</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Erreur de connexion</div><div style="font-size:14px;color:var(--text2)">Impossible de charger le questionnaire. Réessayez dans quelques instants.</div></div>';
+      return;
+    }
+    document.getElementById('setup-screen').style.display='block';
+    toast('Erreur de connexion. Vérifiez vos clés Supabase.','error');
+  }
 }
 
 function copySQL(){
@@ -442,7 +472,8 @@ async function finishSetup(){
     if(error)throw error;
     sc(K_URL,url);sc(K_KEY,key);sc(K_PWD,pwd);SB=client;
     hideLov();document.getElementById('setup-screen').style.display='none';document.getElementById('login-screen').style.display='flex';
-    toast('Connexion réussie ! Connectez-vous maintenant.');
+    // Injecter les clés dans le code source sur le serveur via instructions
+    toast('Connexion réussie ! Maintenant suivez l\'étape finale : copiez vos clés dans le fichier index.html sur GitHub (cherchez __SUPA_URL__ et __SUPA_KEY__ et remplacez-les par vos vraies valeurs). Cliquez Paramètres pour voir vos clés.','info');
   }catch(e){hideLov();toast('Connexion échouée. Vérifiez l\'URL, la clé et que le SQL a été exécuté.','error');}
 }
 
