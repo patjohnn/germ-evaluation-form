@@ -3,20 +3,29 @@ const path = require('path');
 const fs = require('fs');
 const app = express();
 
-// Clés Supabase — définies dans Vercel > Settings > Environment Variables
 const SUPA_URL = process.env.SUPA_URL || '';
 const SUPA_KEY = process.env.SUPA_KEY || '';
+
+// Route de debug — allez sur /debug pour vérifier que les variables arrivent
+app.get('/debug', (req, res) => {
+  res.json({
+    supa_url_present: !!SUPA_URL,
+    supa_url_start: SUPA_URL ? SUPA_URL.substring(0, 30) + '...' : 'VIDE',
+    supa_key_present: !!SUPA_KEY,
+    supa_key_start: SUPA_KEY ? SUPA_KEY.substring(0, 20) + '...' : 'VIDE',
+    node_env: process.env.NODE_ENV || 'non défini'
+  });
+});
 
 app.get('*', (req, res) => {
   try {
     let html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-    // Injecter les clés pour tous les visiteurs (admin ET répondants)
     html = html.replace("'%%SUPA_URL%%'", "'" + SUPA_URL + "'");
     html = html.replace("'%%SUPA_KEY%%'", "'" + SUPA_KEY + "'");
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
   } catch(e) {
-    res.status(500).send('Erreur serveur: ' + e.message);
+    res.status(500).send('Erreur: ' + e.message);
   }
 });
 
