@@ -529,7 +529,7 @@ async function renderDashboard(){
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-lbl">Questionnaires</div><div class="stat-val">${(qs||[]).length}</div><div class="stat-sub">créés au total</div></div>
       <div class="stat-card"><div class="stat-lbl">Réponses totales</div><div class="stat-val">${(rs||[]).length}</div><div class="stat-sub">soumissions reçues</div></div>
-      <div class="stat-card"><div class="stat-lbl">Aujourd'hui</div><div class="stat-val">${todayRs}</div><div class="stat-sub">nouvelles réponses</div></div>
+      <div class="stat-card"><div class="stat-lbl">Aujourd&#39;hui</div><div class="stat-val">${todayRs}</div><div class="stat-sub">nouvelles réponses</div></div>
       <div class="stat-card"><div class="stat-lbl">Questionnaires actifs</div><div class="stat-val">${(qs||[]).filter(q=>q.active).length}</div><div class="stat-sub">acceptent des réponses</div></div>
     </div>
     <div class="card">
@@ -558,7 +558,7 @@ async function renderQuestionnaires(){
   const[{data:qs},{data:rs}]=await Promise.all([SB.from('questionnaires').select('*').order('created_at',{ascending:false}),SB.from('responses').select('questionnaire_id')]);
   updateBadges();
   document.getElementById('content').innerHTML=`
-    <div class="pg-title">Questionnaires</div><div class="pg-sub">Créez, gérez et partagez vos questionnaires d'évaluation.</div>
+    <div class="pg-title">Questionnaires</div><div class="pg-sub">Créez, gérez et partagez vos questionnaires d&#39;évaluation.</div>
     ${!(qs||[]).length?`<div class="card"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Aucun questionnaire</div><div class="empty-sub">Créez votre premier questionnaire.</div><br><button class="btn btn-primary" onclick="openQModal()">+ Créer un questionnaire</button></div></div>`
     :`<div class="card" style="padding:0"><table class="dtbl"><thead><tr><th>Titre</th><th>Type</th><th>Questions</th><th>Réponses</th><th>Créé le</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
     ${(qs||[]).map(q=>{const qrs=(rs||[]).filter(r=>r.questionnaire_id===q.id).length;return`<tr>
@@ -642,6 +642,7 @@ function renderBuild(){
     </div>`).join('');
   updateBEmpty();
   document.getElementById('q-count-lbl').textContent=bQs.length?`(${bQs.length})`:'';
+  setTimeout(attachBuildEvents,0);
 }
 
 function buildBody(q){
@@ -678,11 +679,16 @@ function buildBody(q){
 // ─── NOTATION ─────────────────────────────────────────
 function buildCorrect(q){
   if(q.type==='text'||q.type==='table')
-    return '<div style="font-size:11px;color:var(--text3);margin-top:4px">&#9998; Correction manuelle par points</div>';
+    return '<div style="font-size:11px;color:var(--text3);margin-top:4px">&#9998; Correction manuelle</div>';
+  const qid=q.id;
   if(q.type==='qcm'){
     const opts=q.options.map((o,oi)=>{
       const chk=q.correctAnswer===oi?'checked':'';
-      return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px;cursor:pointer"><input type="radio" name="ca-'+q.id+'" '+chk+' onchange="uQ(''+q.id+'','correctAnswer','+oi+')"> '+esc(o)+'</label>';
+      const el=document.createElement('label');
+      el.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px;cursor:pointer';
+      el.innerHTML='<input type="radio" name="ca-'+qid+'" '+chk+'> '+esc(o);
+      el.querySelector('input').addEventListener('change',()=>uQ(qid,'correctAnswer',oi));
+      return el.outerHTML;
     }).join('');
     return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonne réponse :</div>'+opts+'</div>';
   }
@@ -690,20 +696,28 @@ function buildCorrect(q){
     const ca=Array.isArray(q.correctAnswer)?q.correctAnswer:[];
     const opts=q.options.map((o,oi)=>{
       const chk=ca.includes(oi)?'checked':'';
-      return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px;cursor:pointer"><input type="checkbox" '+chk+' onchange="togCA(''+q.id+'','+oi+')"> '+esc(o)+'</label>';
+      const el=document.createElement('label');
+      el.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px;cursor:pointer';
+      el.innerHTML='<input type="checkbox" '+chk+'> '+esc(o);
+      el.querySelector('input').addEventListener('change',()=>togCA(qid,oi));
+      return el.outerHTML;
     }).join('');
     return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonnes réponses :</div>'+opts+'</div>';
   }
   if(q.type==='yesno'){
     const opts=['Oui','Non','Sans avis'].map(v=>{
       const chk=q.correctAnswer===v?'checked':'';
-      return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-right:12px;cursor:pointer"><input type="radio" name="ca-'+q.id+'" '+chk+' onchange="uQ(''+q.id+'','correctAnswer',''+v+'')"> '+v+'</label>';
+      const el=document.createElement('label');
+      el.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;margin-right:12px;cursor:pointer';
+      el.innerHTML='<input type="radio" name="ca-'+qid+'" '+chk+'> '+v;
+      el.querySelector('input').addEventListener('change',()=>uQ(qid,'correctAnswer',v));
+      return el.outerHTML;
     }).join('');
     return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonne réponse :</div><div style="display:flex">'+opts+'</div></div>';
   }
   if(q.type==='scale'){
-    const val=q.correctAnswer!==null?q.correctAnswer:q.min;
-    return '<div style="margin-top:.5rem;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--text2)">Réponse attendue :</span><input type="number" min="'+q.min+'" max="'+q.max+'" value="'+val+'" oninput="uQ(''+q.id+'','correctAnswer',+this.value)" style="width:60px;padding:5px 8px;font-size:13px"></div>';
+    const val=q.correctAnswer!==null&&q.correctAnswer!==undefined?q.correctAnswer:q.min;
+    return '<div style="margin-top:.5rem;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--text2)">Réponse attendue :</span><input type="number" min="'+q.min+'" max="'+q.max+'" value="'+val+'" style="width:60px;padding:5px 8px;font-size:13px" id="scale-ca-'+qid+'"></div>';
   }
   return '';
 }
@@ -745,6 +759,13 @@ function getMention(pct){
   return{txt:'Insuffisant',bg:'#fcebeb',fg:'#a32d2d'};
 }
 
+// Attacher les events après render pour les champs scale
+function attachBuildEvents(){
+  document.querySelectorAll('[id^="scale-ca-"]').forEach(inp=>{
+    const qid=inp.id.replace('scale-ca-','');
+    inp.addEventListener('input',()=>uQ(qid,'correctAnswer',+inp.value));
+  });
+}
 const updateBEmpty=()=>{const e=document.getElementById('builder-empty');if(e)e.style.display=bQs.length===0?'block':'none';};
 const uQ=(qid,k,v)=>{const q=bQs.find(x=>x.id===qid);if(q)q[k]=v;};
 const uOpt=(qid,oi,v)=>{const q=bQs.find(x=>x.id===qid);if(q)q.options[oi]=v;};
