@@ -678,8 +678,44 @@ function buildBody(q){
 
 // ─── NOTATION ─────────────────────────────────────────
 function buildCorrect(q){
-  if(q.type==='text'||q.type==='table')
-    return '<div style="font-size:11px;color:var(--text3);margin-top:4px">&#9998; Correction manuelle</div>';
+  if(q.type==='text')
+    return '<div style="font-size:11px;color:var(--text3);margin-top:4px">&#9998; Correction manuelle par points</div>';
+  if(q.type==='table'){
+    // Points par ligne + réponses attendues par colonne
+    const cols=q.columns||[];
+    const rows=q.rows||[''];
+    // Initialiser correctAnswer pour tableau si besoin
+    if(!q.correctAnswer||!Array.isArray(q.correctAnswer)){
+      q.correctAnswer=rows.map(()=>cols.map(()=>''));
+    }
+    // Points par ligne
+    if(!q.pointsPerRow||q.pointsPerRow.length!==rows.length){
+      q.pointsPerRow=rows.map(()=>1);
+    }
+    let html='<div style="margin-top:.75rem">';
+    html+='<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px">Réponses attendues par ligne :</div>';
+    html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    html+='<thead><tr>';
+    html+='<th style="background:var(--bg3);padding:5px 8px;border:.5px solid var(--border2);text-align:left;width:35%">Phrase / Ligne</th>';
+    cols.forEach(c=>{html+='<th style="background:var(--bg3);padding:5px 8px;border:.5px solid var(--border2);text-align:left">'+esc(c)+'</th>';});
+    html+='<th style="background:var(--bg3);padding:5px 8px;border:.5px solid var(--border2);text-align:center;width:60px">Pts</th>';
+    html+='</tr></thead><tbody>';
+    rows.forEach((r,ri)=>{
+      html+='<tr>';
+      html+='<td style="border:.5px solid var(--border2);padding:4px 6px;background:var(--bg2);font-size:11px;color:var(--text2)">'+esc(r||'Ligne '+(ri+1))+'</td>';
+      cols.forEach((_,ci)=>{
+        const val=(q.correctAnswer&&q.correctAnswer[ri])?q.correctAnswer[ri][ci]||'':'';
+        html+='<td style="border:.5px solid var(--border2);padding:0"><input type="text" value="'+esc(val)+'" placeholder="Réponse attendue" id="tca-'+q.id+'-'+ri+'-'+ci+'" style="width:100%;border:none;background:transparent;padding:5px 7px;font-size:12px;font-family:inherit"></td>';
+      });
+      const pts=(q.pointsPerRow&&q.pointsPerRow[ri]!==undefined)?q.pointsPerRow[ri]:1;
+      html+='<td style="border:.5px solid var(--border2);padding:0"><input type="number" min="0" max="100" value="'+pts+'" id="tpr-'+q.id+'-'+ri+'" style="width:100%;border:none;background:transparent;padding:5px 4px;font-size:12px;text-align:center;font-family:inherit"></td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table></div>';
+    html+='<div style="font-size:10px;color:var(--text3);margin-top:4px">Laissez vide si pas de réponse attendue pour une colonne.</div>';
+    html+='</div>';
+    return html;
+  }
   const qid=q.id;
   if(q.type==='qcm'){
     const opts=q.options.map((o,oi)=>{
@@ -727,7 +763,14 @@ const togCA=(qid,oi)=>{
   const ix=q.correctAnswer.indexOf(oi);
   if(ix>=0)q.correctAnswer.splice(ix,1);else q.correctAnswer.push(oi);
 };
-function calcTotalPts(q){return(q.questions||[]).reduce((s,qq)=>s+(qq.points||1),0);}
+function calcTotalPts(q){
+  return(q.questions||[]).reduce((s,qq)=>{
+    if(qq.type==='table'&&Array.isArray(qq.pointsPerRow)&&qq.pointsPerRow.length>0){
+      return s+qq.pointsPerRow.reduce((a,p)=>a+(+p||0),0);
+    }
+    return s+(qq.points||1);
+  },0);
+}
 function autoGrade(q,answers){
   const sc={};
   (q.questions||[]).forEach(qq=>{
@@ -745,6 +788,20 @@ function autoGrade(q,answers){
       sc[qq.id]=(ans===ca)?pts:0;
     } else if(qq.type==='scale'){
       sc[qq.id]=(+ans===+ca)?pts:0;
+    } else if(qq.type==='table'){
+      if(!ans||!ans.rows){sc[qq.id]=null;return;}
+      const rowScores=(ans.rows||[]).map((row,ri)=>{
+        const expRow=Array.isArray(ca)?ca[ri]:null;
+        const rowPts=Array.isArray(qq.pointsPerRow)?(+(qq.pointsPerRow[ri])||0):1;
+        if(!expRow||expRow.every(v=>!v))return null;
+        const allOk=(qq.columns||[]).every((_,ci)=>{
+          const exp=(expRow[ci]||'').trim().toLowerCase();
+          const got=((row.cols&&row.cols[ci])||'').trim().toLowerCase();
+          return !exp||exp===got;
+        });
+        return allOk?rowPts:0;
+      });
+      sc[qq.id]=rowScores.every(s=>s!==null)?rowScores.reduce((a,s)=>a+s,0):null;
     } else {
       sc[qq.id]=null;
     }
@@ -761,9 +818,31 @@ function getMention(pct){
 
 // Attacher les events après render pour les champs scale
 function attachBuildEvents(){
+  // Scale
   document.querySelectorAll('[id^="scale-ca-"]').forEach(inp=>{
     const qid=inp.id.replace('scale-ca-','');
     inp.addEventListener('input',()=>uQ(qid,'correctAnswer',+inp.value));
+  });
+  // Table correct answers
+  document.querySelectorAll('[id^="tca-"]').forEach(inp=>{
+    const parts=inp.id.split('-');// tca-QID-RI-CI
+    const qid=parts[1],ri=+parts[2],ci=+parts[3];
+    inp.addEventListener('input',()=>{
+      const q=bQs.find(x=>x.id===qid);if(!q)return;
+      if(!Array.isArray(q.correctAnswer))q.correctAnswer=[];
+      if(!q.correctAnswer[ri])q.correctAnswer[ri]=[];
+      q.correctAnswer[ri][ci]=inp.value;
+    });
+  });
+  // Table points per row
+  document.querySelectorAll('[id^="tpr-"]').forEach(inp=>{
+    const parts=inp.id.split('-');// tpr-QID-RI
+    const qid=parts[1],ri=+parts[2];
+    inp.addEventListener('input',()=>{
+      const q=bQs.find(x=>x.id===qid);if(!q)return;
+      if(!Array.isArray(q.pointsPerRow))q.pointsPerRow=[];
+      q.pointsPerRow[ri]=+inp.value;
+    });
   });
 }
 const updateBEmpty=()=>{const e=document.getElementById('builder-empty');if(e)e.style.display=bQs.length===0?'block':'none';};
@@ -858,8 +937,33 @@ async function viewResponses(qid){
 
       let ansHtml='';
       if(qq.type==='table'&&ans&&ans.rows){
-        const filled=ans.rows.filter(rw=>rw.phrase||(rw.cols||[]).some(c=>c));
-        ansHtml='<table class="rtbl" style="margin:.35rem 0"><thead><tr><th>Phrase</th>'+(qq.columns||[]).map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+filled.map(rw=>'<tr><td>'+esc(rw.phrase||'')+'</td>'+(qq.columns||[]).map((_,ci)=>'<td>'+esc((rw.cols&&rw.cols[ci])||'')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+        const ca2=qq.correctAnswer;
+        const ppr=qq.pointsPerRow;
+        let tHtml='<table class="rtbl" style="margin:.35rem 0"><thead><tr>';
+        tHtml+='<th>Phrase</th>'+(qq.columns||[]).map(c=>'<th>'+esc(c)+'</th>').join('');
+        tHtml+='<th style="text-align:center">Pts</th></tr></thead><tbody>';
+        ans.rows.forEach((rw,ri)=>{
+          const expRow=Array.isArray(ca2)?ca2[ri]:null;
+          const rowPts=Array.isArray(ppr)?(+(ppr[ri])||0):1;
+          tHtml+='<tr><td>'+esc(rw.phrase||'')+'</td>';
+          (qq.columns||[]).forEach((_,ci)=>{
+            const got=esc((rw.cols&&rw.cols[ci])||'');
+            const exp=(expRow&&expRow[ci])?expRow[ci].trim():'';
+            let cellStyle='';
+            if(exp&&got){
+              const match=got.toLowerCase()===exp.toLowerCase();
+              cellStyle=match?'background:#eaf3de':'background:#fcebeb';
+            }
+            const expHint=exp?'<div style="font-size:10px;color:#9a9893">Attendu: '+esc(exp)+'</div>':'';
+            tHtml+='<td style="'+cellStyle+'">'+got+expHint+'</td>';
+          });
+          // Champ points manuel pour cette ligne
+          const msVal=(manSc[qq.id]&&manSc[qq.id]['row_'+ri]!==undefined)?manSc[qq.id]['row_'+ri]:(autoSc[qq.id]!==null&&autoSc[qq.id]!==undefined?'auto':'');
+          tHtml+='<td style="text-align:center;padding:2px 4px"><input type="number" min="0" max="'+rowPts+'" placeholder="0-'+rowPts+'" id="ms-'+r.id+'-'+qq.id+'-row-'+ri+'" value="'+(manSc[qq.id]&&manSc[qq.id]['row_'+ri]!==undefined?manSc[qq.id]['row_'+ri]:'')+'" style="width:52px;text-align:center;padding:3px 4px;font-size:12px;border:.5px solid var(--border2);border-radius:4px"><span style="font-size:10px;color:var(--text3)">/'+rowPts+'</span></td>';
+          tHtml+='</tr>';
+        });
+        tHtml+='</tbody></table>';
+        ansHtml=tHtml;
       } else if(qq.type==='checkbox'){
         ansHtml='<div class="corr-answer">'+esc(Array.isArray(ans)?ans.join(', '):(ans||'—'))+'</div>';
       } else {
@@ -910,28 +1014,47 @@ async function viewResponses(qid){
 }
 
 async function saveGrade(rid,qid){
-  const[{data:q}]= await Promise.all([SB.from('questionnaires').select('*').eq('id',qid).single()]);
+  const [{data:q}]=await Promise.all([SB.from('questionnaires').select('*').eq('id',qid).single()]);
+  const {data:r}=await SB.from('responses').select('*').eq('id',rid).single();
+  const autoSc=autoGrade(q,r.answers||{});
   const manSc={};
   (q.questions||[]).forEach(qq=>{
-    const el=document.getElementById('ms-'+rid+'-'+qq.id);
-    if(el&&el.value!=='')manSc[qq.id]=+el.value;
+    if(qq.type==='table'){
+      // Récupérer les points par ligne
+      const rowScores={};
+      const rows=(r.answers&&r.answers[qq.id]&&r.answers[qq.id].rows)||[];
+      rows.forEach((_,ri)=>{
+        const el=document.getElementById('ms-'+rid+'-'+qq.id+'-row-'+ri);
+        if(el&&el.value!=='')rowScores['row_'+ri]=+el.value;
+      });
+      if(Object.keys(rowScores).length>0)manSc[qq.id]=rowScores;
+    } else {
+      const el=document.getElementById('ms-'+rid+'-'+qq.id);
+      if(el&&el.value!=='')manSc[qq.id]=+el.value;
+    }
   });
-  const{data:r}=await SB.from('responses').select('*').eq('id',rid).single();
-  const autoSc=autoGrade(q,r.answers||{});
   const totalPts=calcTotalPts(q);
   let earned=0;
   (q.questions||[]).forEach(qq=>{
     const ms=manSc[qq.id];
     const as=autoSc[qq.id];
-    if(ms!==undefined)earned+=+ms;
-    else if(as!==null&&as!==undefined)earned+=+as;
+    if(qq.type==='table'){
+      if(ms&&typeof ms==='object'){
+        earned+=Object.values(ms).reduce((a,v)=>a+(+v||0),0);
+      } else if(as!==null&&as!==undefined){
+        earned+=+as;
+      }
+    } else {
+      if(ms!==undefined)earned+=+ms;
+      else if(as!==null&&as!==undefined)earned+=+as;
+    }
   });
   const pct=totalPts>0?Math.round(earned/totalPts*100):0;
   await SB.from('responses').update({
     manual_scores:manSc,final_score:earned,
     total_points:totalPts,score_pct:pct,graded:true
   }).eq('id',rid);
-  toast('Note enregistree: '+earned+'/'+totalPts+' pts ('+pct+'%)');
+  toast('Note enregistrée : '+earned+'/'+totalPts+' pts ('+pct+'%)');
   viewResponses(qid);
 }
 
