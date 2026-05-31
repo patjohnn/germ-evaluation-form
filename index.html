@@ -126,18 +126,6 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--te
 .tqtbl td textarea{width:100%;min-height:48px;border:none;background:transparent;resize:vertical;padding:7px 10px;font-size:13px;font-family:inherit;color:var(--text);outline:none}
 .tqtbl td textarea:focus{background:var(--bg2)}
 .tq-phrase{background:var(--bg2) !important;padding:9px 10px !important;font-size:13px;color:var(--text);line-height:1.5}
-/* notation */
-.pts-input{width:70px;text-align:center;font-size:13px;padding:6px 8px}
-.corr-block{background:var(--bg2);border-radius:var(--r);padding:.875rem 1rem;margin-bottom:.5rem;border:.5px solid var(--border)}
-.corr-q{font-size:12px;color:var(--text2);margin-bottom:.35rem;font-weight:500}
-.corr-ans{font-size:13px;color:var(--text);margin-bottom:.5rem;padding:6px 10px;background:var(--bg);border-radius:var(--r);border:.5px solid var(--border)}
-.corr-pts{display:flex;align-items:center;gap:8px;margin-top:.5rem}
-.score-banner{background:var(--text);color:var(--bg);border-radius:var(--rl);padding:1.5rem;text-align:center;margin-bottom:1rem}
-.score-big{font-size:48px;font-weight:700;line-height:1}
-.score-sub{font-size:14px;opacity:.7;margin-top:.25rem}
-.mention{font-size:13px;font-weight:500;padding:4px 14px;border-radius:99px;display:inline-block;margin-top:.75rem}
-.opt-correct{background:var(--green-bg) !important;border-color:var(--green-border) !important}
-.opt-wrong{background:var(--red-bg) !important;border-color:var(--red-border) !important}
 /* respondent */
 .q-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.25rem 1.5rem;margin-bottom:1rem}
 .q-lbl{font-size:14px;font-weight:500;margin-bottom:.75rem;line-height:1.5}
@@ -185,23 +173,25 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
 .login-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rxl);padding:2.5rem;width:100%;max-width:380px}
 .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:2rem}
 .login-icon{width:36px;height:36px;background:var(--text);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--bg);font-size:16px;font-weight:700}
-/* notation */
-.pts-input{width:70px;text-align:center;font-size:13px;padding:6px 8px}
-.corr-block{background:var(--bg2);border-radius:var(--r);padding:.875rem 1rem;margin-bottom:.5rem;border:.5px solid var(--border)}
-.corr-q{font-size:12px;color:var(--text2);margin-bottom:.35rem;font-weight:500}
-.corr-ans{font-size:13px;color:var(--text);margin-bottom:.5rem;padding:6px 10px;background:var(--bg);border-radius:var(--r);border:.5px solid var(--border)}
-.corr-pts{display:flex;align-items:center;gap:8px;margin-top:.5rem}
-.score-banner{background:var(--text);color:var(--bg);border-radius:var(--rl);padding:1.5rem;text-align:center;margin-bottom:1rem}
-.score-big{font-size:48px;font-weight:700;line-height:1}
-.score-sub{font-size:14px;opacity:.7;margin-top:.25rem}
-.mention{font-size:13px;font-weight:500;padding:4px 14px;border-radius:99px;display:inline-block;margin-top:.75rem}
-.opt-correct{background:var(--green-bg) !important;border-color:var(--green-border) !important}
-.opt-wrong{background:var(--red-bg) !important;border-color:var(--red-border) !important}
 /* respondent */
 #respondent-app{min-height:100vh;background:var(--bg2)}
 .r-header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5rem;height:52px;display:flex;align-items:center;justify-content:space-between}
 .r-content{max-width:740px;margin:0 auto;padding:1.75rem 1rem 4rem}
 @media(max-width:768px){#sidebar{display:none}#main{margin-left:0}.frow2,.frow3{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}}
+
+/* ── NOTATION ── */
+.pts-badge{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:20px;padding:0 6px;border-radius:99px;font-size:10px;font-weight:600}
+.score-box{background:var(--text);color:var(--bg);border-radius:var(--rl);padding:1.5rem;text-align:center;margin-bottom:1rem}
+.score-num{font-size:44px;font-weight:700;line-height:1}
+.score-pct{font-size:13px;opacity:.6;margin-top:.25rem}
+.mention-badge{font-size:12px;font-weight:600;padding:4px 14px;border-radius:99px;display:inline-block;margin-top:.75rem}
+.corr-row{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--r);padding:.875rem 1rem;margin-bottom:.5rem}
+.corr-label{font-size:12px;color:var(--text2);font-weight:500;margin-bottom:.35rem}
+.corr-answer{background:var(--bg);border:.5px solid var(--border);border-radius:var(--r);padding:6px 10px;font-size:13px;margin-bottom:.5rem}
+.corr-pts-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pts-field{width:65px;text-align:center;padding:5px 8px;font-size:13px}
+.r-opt-correct{background:var(--green-bg)!important;border-color:var(--green-border)!important}
+.r-opt-wrong{background:var(--red-bg)!important;border-color:var(--red-border)!important}
 </style>
 </head>
 <body>
@@ -242,11 +232,6 @@ create table if not exists responses (
   respondent_name text not null,
   respondent_email text not null,
   answers jsonb default '{}',
-  manual_scores jsonb default '{}',
-  final_score integer,
-  total_points integer,
-  score_pct integer,
-  graded boolean default false,
   created_at timestamptz default now()
 );
 
@@ -650,15 +635,9 @@ function renderBuild(){
           <button class="btn-icon btn-danger" onclick="rmQ('${q.id}')">✕</button>
         </div>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:.5rem">
-        <input type="text" placeholder="Libellé de la question *" value="${esc(q.label||'')}" oninput="uQ('${q.id}','label',this.value)" style="font-weight:500;flex:1">
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <label style="font-size:11px;color:var(--text2);white-space:nowrap">Points :</label>
-          <input type="number" class="pts-input" min="0" max="100" value="${q.points||1}" oninput="uQ('${q.id}','points',+this.value)" style="width:60px">
-        </div>
-      </div>
+      <div style="display:flex;gap:8px;margin-bottom:.5rem"><input type="text" placeholder="Libellé *" value="${esc(q.label||'')}" oninput="uQ('${q.id}','label',this.value)" style="font-weight:500;flex:1"><label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px;flex-shrink:0">Pts:<input type="number" min="0" max="100" value="${q.points||1}" oninput="uQ('${q.id}','points',+this.value)" style="width:52px;padding:5px 6px;font-size:12px;margin-left:4px"></label></div>
       ${buildBody(q)}
-      ${buildCorrectAnswer(q)}
+      ${buildCorrect(q)}
       <label style="display:flex;align-items:center;gap:8px;margin-top:.5rem;font-size:12px;color:var(--text2);cursor:pointer"><input type="checkbox" ${q.required?'checked':''} onchange="uQ('${q.id}','required',this.checked)"> Obligatoire</label>
     </div>`).join('');
   updateBEmpty();
@@ -695,32 +674,75 @@ function buildBody(q){
   return'';
 }
 
-function buildCorrectAnswer(q){
-  if(q.type==='text'||q.type==='table') return '<div style="font-size:11px;color:var(--text3);margin-top:4px">Correction manuelle par points</div>';
+
+// ─── NOTATION ─────────────────────────────────────────
+function buildCorrect(q){
+  if(q.type==='text'||q.type==='table')
+    return '<div style="font-size:11px;color:var(--text3);margin-top:4px">&#9998; Correction manuelle par points</div>';
   if(q.type==='qcm'){
-    return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonne réponse :</div>'+
-      q.options.map((o,oi)=>'<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:4px;cursor:pointer"><input type="radio" name="corr-'+q.id+'" '+(q.correctAnswer===oi?'checked':'')+' onchange="uQ(''+q.id+'','correctAnswer','+oi+')"> '+esc(o)+'</label>').join('')+'</div>';
+    const opts=q.options.map((o,oi)=>{
+      const chk=q.correctAnswer===oi?'checked':'';
+      return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px;cursor:pointer"><input type="radio" name="ca-'+q.id+'" '+chk+' onchange="uQ(''+q.id+'','correctAnswer','+oi+')"> '+esc(o)+'</label>';
+    }).join('');
+    return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonne réponse :</div>'+opts+'</div>';
   }
   if(q.type==='checkbox'){
     const ca=Array.isArray(q.correctAnswer)?q.correctAnswer:[];
-    return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonnes réponses (cochez toutes les correctes) :</div>'+
-      q.options.map((o,oi)=>{const chk=ca.includes(oi);return'<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:4px;cursor:pointer"><input type="checkbox" '+(chk?'checked':'')+' onchange="togCorrectChk(''+q.id+'','+oi+')"> '+esc(o)+'</label>';}).join('')+'</div>';
+    const opts=q.options.map((o,oi)=>{
+      const chk=ca.includes(oi)?'checked':'';
+      return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px;cursor:pointer"><input type="checkbox" '+chk+' onchange="togCA(''+q.id+'','+oi+')"> '+esc(o)+'</label>';
+    }).join('');
+    return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonnes réponses :</div>'+opts+'</div>';
   }
   if(q.type==='yesno'){
-    return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonne réponse :</div>'+
-      '<div style="display:flex;gap:8px">'+['Oui','Non','Sans avis'].map(v=>'<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="radio" name="corr-'+q.id+'" '+(q.correctAnswer===v?'checked':'')+' onchange="uQ(''+q.id+'','correctAnswer',''+v+'')"> '+v+'</label>').join('')+'</div></div>';
+    const opts=['Oui','Non','Sans avis'].map(v=>{
+      const chk=q.correctAnswer===v?'checked':'';
+      return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-right:12px;cursor:pointer"><input type="radio" name="ca-'+q.id+'" '+chk+' onchange="uQ(''+q.id+'','correctAnswer',''+v+'')"> '+v+'</label>';
+    }).join('');
+    return '<div style="margin-top:.5rem"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">Bonne réponse :</div><div style="display:flex">'+opts+'</div></div>';
   }
   if(q.type==='scale'){
-    return '<div style="margin-top:.5rem;display:flex;align-items:center;gap:8px"><label style="font-size:11px;color:var(--text2)">Réponse attendue :</label><input type="number" min="'+q.min+'" max="'+q.max+'" value="'+(q.correctAnswer||q.min)+'" oninput="uQ(''+q.id+'','correctAnswer',+this.value)" style="width:70px;font-size:13px;padding:5px 8px"></div>';
+    const val=q.correctAnswer!==null?q.correctAnswer:q.min;
+    return '<div style="margin-top:.5rem;display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:var(--text2)">Réponse attendue :</span><input type="number" min="'+q.min+'" max="'+q.max+'" value="'+val+'" oninput="uQ(''+q.id+'','correctAnswer',+this.value)" style="width:60px;padding:5px 8px;font-size:13px"></div>';
   }
   return '';
 }
-
-function togCorrectChk(qid,oi){
+const togCA=(qid,oi)=>{
   const q=bQs.find(x=>x.id===qid);if(!q)return;
   if(!Array.isArray(q.correctAnswer))q.correctAnswer=[];
-  const idx=q.correctAnswer.indexOf(oi);
-  if(idx>=0)q.correctAnswer.splice(idx,1);else q.correctAnswer.push(oi);
+  const ix=q.correctAnswer.indexOf(oi);
+  if(ix>=0)q.correctAnswer.splice(ix,1);else q.correctAnswer.push(oi);
+};
+function calcTotalPts(q){return(q.questions||[]).reduce((s,qq)=>s+(qq.points||1),0);}
+function autoGrade(q,answers){
+  const sc={};
+  (q.questions||[]).forEach(qq=>{
+    const ans=answers[qq.id];
+    const pts=qq.points||1;
+    const ca=qq.correctAnswer;
+    if(ca===null||ca===undefined){sc[qq.id]=null;return;}
+    if(qq.type==='qcm'){
+      sc[qq.id]=(ans===qq.options[ca])?pts:0;
+    } else if(qq.type==='checkbox'){
+      const expected=(Array.isArray(ca)?ca:[]).map(i=>qq.options[i]).sort().join(',');
+      const got=(Array.isArray(ans)?[...ans]:[]).sort().join(',');
+      sc[qq.id]=(expected===got)?pts:0;
+    } else if(qq.type==='yesno'){
+      sc[qq.id]=(ans===ca)?pts:0;
+    } else if(qq.type==='scale'){
+      sc[qq.id]=(+ans===+ca)?pts:0;
+    } else {
+      sc[qq.id]=null;
+    }
+  });
+  return sc;
+}
+function getMention(pct){
+  if(pct>=90)return{txt:'Excellent',bg:'#eaf3de',fg:'#3b6d11'};
+  if(pct>=75)return{txt:'Bien',bg:'#e6f1fb',fg:'#185fa5'};
+  if(pct>=60)return{txt:'Assez bien',bg:'#e1f5ee',fg:'#0f6e56'};
+  if(pct>=50)return{txt:'Passable',bg:'#faeeda',fg:'#854f0b'};
+  return{txt:'Insuffisant',bg:'#fcebeb',fg:'#a32d2d'};
 }
 
 const updateBEmpty=()=>{const e=document.getElementById('builder-empty');if(e)e.style.display=bQs.length===0?'block':'none';};
@@ -770,36 +792,6 @@ async function delResp(id){
   renderResponses();toast('Réponse supprimée.');
 }
 
-// Calcul auto de la note
-function autoScore(q, answers){
-  const scores={};
-  (q.questions||[]).forEach(qq=>{
-    const ans=answers[qq.id];
-    const pts=qq.points||1;
-    if(qq.correctAnswer===null||qq.correctAnswer===undefined){scores[qq.id]=null;return;}
-    if(qq.type==='qcm'){scores[qq.id]=(ans===qq.options[qq.correctAnswer]||(typeof ans==='number'&&ans===qq.correctAnswer))?pts:0;}
-    else if(qq.type==='checkbox'){
-      const ca=Array.isArray(qq.correctAnswer)?qq.correctAnswer.map(i=>qq.options[i]).sort():[];
-      const ua=Array.isArray(ans)?[...ans].sort():[];
-      scores[qq.id]=(JSON.stringify(ca)===JSON.stringify(ua))?pts:0;
-    }
-    else if(qq.type==='yesno'){scores[qq.id]=(ans===qq.correctAnswer)?pts:0;}
-    else if(qq.type==='scale'){scores[qq.id]=(+ans===+qq.correctAnswer)?pts:0;}
-    else{scores[qq.id]=null;} // text/table = correction manuelle
-  });
-  return scores;
-}
-
-function totalPoints(q){return (q.questions||[]).reduce((s,qq)=>s+(qq.points||1),0);}
-
-function getMention(pct){
-  if(pct>=90)return{txt:'Excellent',cls:'bg-green'};
-  if(pct>=75)return{txt:'Bien',cls:'bg-blue'};
-  if(pct>=60)return{txt:'Assez bien',cls:'bg-teal'};
-  if(pct>=50)return{txt:'Passable',cls:'bg-amber'};
-  return{txt:'Insuffisant',cls:'bg-red'};
-}
-
 async function viewResponses(qid){
   openModal('modal-resp');
   document.getElementById('mr-content').innerHTML=loading();
@@ -807,62 +799,72 @@ async function viewResponses(qid){
     SB.from('questionnaires').select('*').eq('id',qid).single(),
     SB.from('responses').select('*').eq('questionnaire_id',qid).order('created_at',{ascending:false})
   ]);
-  if(!q){toast('Questionnaire introuvable.','error');return;}
+  if(!q){toast('Introuvable.','error');return;}
+  const totalPts=calcTotalPts(q);
   document.getElementById('mr-title').textContent=q.title;
-  document.getElementById('mr-sub').textContent=(rs||[]).length+' réponse'+((rs||[]).length>1?'s':'')+' reçue'+((rs||[]).length>1?'s':'');
+  document.getElementById('mr-sub').textContent=(rs||[]).length+' réponse(s) — Total: '+totalPts+' pts';
   document.getElementById('mr-export-btn').onclick=()=>exportQCSV(q,rs||[]);
   if(!(rs||[]).length){
-    document.getElementById('mr-content').innerHTML='<div class="empty" style="padding:2rem"><div class="empty-icon">📥</div><div class="empty-title">Aucune réponse pour ce questionnaire</div></div>';
+    document.getElementById('mr-content').innerHTML='<div class="empty" style="padding:2rem"><div class="empty-icon">📥</div><div class="empty-title">Aucune réponse</div></div>';
     return;
   }
-  const totalPts=totalPoints(q);
   document.getElementById('mr-content').innerHTML=(rs||[]).map(r=>{
-    const scores=r.scores||autoScore(q,r.answers||{});
-    const manualPts=r.manual_scores||{};
-    // Calculer la note actuelle
-    let earned=0, pending=0;
+    const autoSc=autoGrade(q,r.answers||{});
+    const manSc=r.manual_scores||{};
+    let earned=0,pending=0;
     (q.questions||[]).forEach(qq=>{
-      const ms=manualPts[qq.id];
-      const as=scores[qq.id];
+      const ms=manSc[qq.id];
+      const as=autoSc[qq.id];
       if(ms!==undefined&&ms!==null)earned+=+ms;
       else if(as!==null&&as!==undefined)earned+=+as;
       else pending+=(qq.points||1);
     });
-    const pct=totalPts>0?Math.round((earned/(totalPts-pending))*100):0;
-    const mention=getMention(pct);
-    const noteStr=pending>0?`${earned}/${totalPts-pending} pts (${pending} pt${pending>1?'s':''} en attente)`:`${earned}/${totalPts} pts`;
+    const pct=totalPts>0?Math.round(earned/totalPts*100):0;
+    const m=getMention(pct);
+    const noteLabel=pending>0?earned+'/'+(totalPts-pending)+' pts (+'+pending+' en attente)':earned+'/'+totalPts+' pts ('+pct+'%)';
 
-    const corrHTML=(q.questions||[]).map(qq=>{
+    const qrows=(q.questions||[]).map(qq=>{
       const ans=(r.answers||{})[qq.id];
-      const ms=manualPts[qq.id];
-      const as=scores[qq.id];
+      const ms=manSc[qq.id];
+      const as=autoSc[qq.id];
       const pts=qq.points||1;
-      const needsManual=(as===null||as===undefined)&&ms===undefined;
-      let ansDisplay='';
-      if(qq.type==='table'){
-        if(ans&&ans.rows){const filled=ans.rows.filter(row=>row.phrase);ansDisplay='<table class="rtbl" style="margin:.25rem 0"><thead><tr><th>Phrase</th>'+qq.columns.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+filled.map(row=>'<tr><td>'+esc(row.phrase)+'</td>'+qq.columns.map((_,ci)=>'<td>'+esc((row.cols&&row.cols[ci])||'')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';}
-      }else if(qq.type==='checkbox'){ansDisplay='<div class="corr-ans">'+esc(Array.isArray(ans)?ans.join(', '):(ans||'—'))+'</div>';}
-      else{ansDisplay='<div class="corr-ans">'+esc(String(ans||'—'))+'</div>';}
-
-      // Badge statut
-      let statusBadge='';
       const curPts=ms!==undefined?ms:as;
-      if(curPts===null||curPts===undefined)statusBadge='<span class="badge bg-amber">À corriger</span>';
-      else if(curPts>=pts)statusBadge='<span class="badge bg-green">✓ '+curPts+'/'+pts+' pts</span>';
-      else if(curPts>0)statusBadge='<span class="badge bg-amber">'+curPts+'/'+pts+' pts</span>';
-      else statusBadge='<span class="badge bg-red">✗ 0/'+pts+' pts</span>';
+      let statusHtml='';
+      if(curPts===null||curPts===undefined)statusHtml='<span class="badge bg-amber">A corriger</span>';
+      else if(+curPts>=pts)statusHtml='<span class="badge bg-green">'+curPts+'/'+pts+' pts</span>';
+      else if(+curPts>0)statusHtml='<span class="badge bg-amber">'+curPts+'/'+pts+' pts</span>';
+      else statusHtml='<span class="badge bg-red">0/'+pts+' pts</span>';
 
-      return '<div class="corr-block">'+
+      let ansHtml='';
+      if(qq.type==='table'&&ans&&ans.rows){
+        const filled=ans.rows.filter(rw=>rw.phrase||(rw.cols||[]).some(c=>c));
+        ansHtml='<table class="rtbl" style="margin:.35rem 0"><thead><tr><th>Phrase</th>'+(qq.columns||[]).map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+filled.map(rw=>'<tr><td>'+esc(rw.phrase||'')+'</td>'+(qq.columns||[]).map((_,ci)=>'<td>'+esc((rw.cols&&rw.cols[ci])||'')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+      } else if(qq.type==='checkbox'){
+        ansHtml='<div class="corr-answer">'+esc(Array.isArray(ans)?ans.join(', '):(ans||'—'))+'</div>';
+      } else {
+        ansHtml='<div class="corr-answer">'+esc(String(ans||'—'))+'</div>';
+      }
+
+      let caHint='';
+      if(qq.correctAnswer!==null&&qq.correctAnswer!==undefined&&qq.type!=='text'&&qq.type!=='table'){
+        let caStr='';
+        if(qq.type==='qcm')caStr=esc(qq.options[qq.correctAnswer]||'');
+        else if(qq.type==='checkbox')caStr=esc((Array.isArray(qq.correctAnswer)?qq.correctAnswer:[]).map(i=>qq.options[i]).join(', '));
+        else caStr=esc(String(qq.correctAnswer));
+        caHint='<span style="font-size:11px;color:var(--text3)">Attendu: <strong>'+caStr+'</strong></span>';
+      }
+
+      return '<div class="corr-row">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.35rem">'+
-          '<div class="corr-q">'+esc(qq.label)+'</div>'+statusBadge+
+          '<span class="corr-label">'+esc(qq.label||qq.type)+'</span>'+statusHtml+
         '</div>'+
-        ansDisplay+
-        '<div class="corr-pts">'+
-          '<label style="font-size:11px;color:var(--text2)">Points attribués :</label>'+
-          '<input type="number" class="pts-input" min="0" max="'+pts+'" value="'+(ms!==undefined?ms:(as!==null&&as!==undefined?as:''))+'" placeholder="0-'+pts+'" id="ms-'+r.id+'-'+qq.id+'">'+
-          '<span style="font-size:11px;color:var(--text3)">/ '+pts+' pts</span>'+
-          (qq.correctAnswer!==null&&qq.correctAnswer!==undefined&&qq.type!=='text'&&qq.type!=='table'?'<span style="font-size:11px;color:var(--text3);margin-left:4px">• Réponse attendue : <strong>'+esc(Array.isArray(qq.correctAnswer)?qq.correctAnswer.map(i=>qq.options[i]).join(', '):(qq.type==='qcm'?qq.options[qq.correctAnswer]:String(qq.correctAnswer)))+'</strong></span>':'')
-        +'</div>'+
+        ansHtml+
+        '<div class="corr-pts-row">'+
+          '<span style="font-size:11px;color:var(--text2)">Points:</span>'+
+          '<input type="number" class="pts-field" min="0" max="'+pts+'" value="'+(ms!==undefined?ms:(as!==null&&as!==undefined?as:''))+'" placeholder="0-'+pts+'" id="ms-'+r.id+'-'+qq.id+'">'+
+          '<span style="font-size:11px;color:var(--text3)">/ '+pts+'</span>'+
+          caHint+
+        '</div>'+
       '</div>';
     }).join('');
 
@@ -871,48 +873,47 @@ async function viewResponses(qid){
         '<div>'+
           '<div style="font-weight:500;font-size:14px">'+esc(r.respondent_name)+'</div>'+
           '<div style="font-size:12px;color:var(--text2)">'+esc(r.respondent_email)+' — '+fmt(r.created_at)+'</div>'+
-          '<div style="margin-top:6px"><span style="font-size:13px;font-weight:500">Note : '+noteStr+'</span> <span class="badge '+mention.cls+'" style="margin-left:6px">'+mention.txt+'</span></div>'+
+          '<div style="margin-top:5px;display:flex;align-items:center;gap:8px">'+
+            '<span style="font-size:13px;font-weight:500">'+noteLabel+'</span>'+
+            (pending===0?'<span class="mention-badge" style="background:'+m.bg+';color:'+m.fg+'">'+m.txt+'</span>':'')+
+          '</div>'+
         '</div>'+
-        '<div style="display:flex;gap:6px">'+
-          '<button class="btn btn-xs btn-success" onclick="saveManualScores(''+r.id+'',''+qid+'')">💾 Enregistrer la note</button>'+
-          '<button class="btn btn-xs btn-danger" onclick="delResp(''+r.id+'');viewResponses(''+qid+'')">🗑</button>'+
+        '<div style="display:flex;gap:6px;flex-direction:column;align-items:flex-end">'+
+          '<button class="btn btn-xs btn-success" onclick="saveGrade(''+r.id+'',''+qid+'')">&#128190; Enregistrer</button>'+
+          '<button class="btn btn-xs btn-danger" onclick="delResp(''+r.id+'');viewResponses(''+qid+'')">&#128465;</button>'+
         '</div>'+
       '</div>'+
-      corrHTML+
+      qrows+
     '</div>';
   }).join('');
 }
 
-async function saveManualScores(rid,qid){
-  const r_data=await SB.from('responses').select('*').eq('id',rid).single();
-  const r=r_data.data;
-  const q_data=await SB.from('questionnaires').select('*').eq('id',qid).single();
-  const q=q_data.data;
-  const manual={};
+async function saveGrade(rid,qid){
+  const[{data:q}]= await Promise.all([SB.from('questionnaires').select('*').eq('id',qid).single()]);
+  const manSc={};
   (q.questions||[]).forEach(qq=>{
-    const inp=document.getElementById('ms-'+rid+'-'+qq.id);
-    if(inp&&inp.value!=='')manual[qq.id]=+inp.value;
+    const el=document.getElementById('ms-'+rid+'-'+qq.id);
+    if(el&&el.value!=='')manSc[qq.id]=+el.value;
   });
-  // Calculer la note finale
-  const autoScores=autoScore(q,r.answers||{});
-  let earned=0;const totalPts=totalPoints(q);
+  const{data:r}=await SB.from('responses').select('*').eq('id',rid).single();
+  const autoSc=autoGrade(q,r.answers||{});
+  const totalPts=calcTotalPts(q);
+  let earned=0;
   (q.questions||[]).forEach(qq=>{
-    const ms=manual[qq.id];
-    const as=autoScores[qq.id];
+    const ms=manSc[qq.id];
+    const as=autoSc[qq.id];
     if(ms!==undefined)earned+=+ms;
     else if(as!==null&&as!==undefined)earned+=+as;
   });
   const pct=totalPts>0?Math.round(earned/totalPts*100):0;
   await SB.from('responses').update({
-    manual_scores:manual,
-    final_score:earned,
-    total_points:totalPts,
-    score_pct:pct,
-    graded:true
+    manual_scores:manSc,final_score:earned,
+    total_points:totalPts,score_pct:pct,graded:true
   }).eq('id',rid);
-  toast('Note enregistrée : '+earned+'/'+totalPts+' pts ('+pct+'%)');
+  toast('Note enregistree: '+earned+'/'+totalPts+' pts ('+pct+'%)');
   viewResponses(qid);
 }
+
 
 function exportQCSV(q,rs){
   const h=['Nom','Email','Date'];
@@ -1074,57 +1075,52 @@ async function submitR(){
   });
   if(missing.length>0){missing.forEach(qq=>{const c=document.getElementById(`qcard-${qq.id}`);if(c){c.style.borderColor='var(--red-border)';setTimeout(()=>c.style.borderColor='',3000);}});toast(`${missing.length} question${missing.length>1?'s':''} obligatoire${missing.length>1?'s':''} sans réponse.`,'error');return;}
   const btn=document.getElementById('submit-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Envoi...';
-  const insertedId=uid();
-  const{error}=await SB.from('responses').insert({id:insertedId,questionnaire_id:curQ.id,respondent_name:name,respondent_email:email,answers:JSON.parse(JSON.stringify(rAns))});
-  if(error){btn.disabled=false;btn.innerHTML='✓ Envoyer mes réponses';toast('Erreur: '+error.message,'error');return;}
-  // Calcul auto de la note immédiatement après soumission
-  const autoSc=autoScore(curQ,rAns);
-  let earned=0,pending=0;
-  const totalPts=totalPoints(curQ);
+  const newId=uid();
+  const autoSc=autoGrade(curQ,rAns);
+  let earned=0,pending=0,totalPts=calcTotalPts(curQ);
   (curQ.questions||[]).forEach(qq=>{
     const as=autoSc[qq.id];
     if(as!==null&&as!==undefined)earned+=+as;
     else pending+=(qq.points||1);
   });
+  const pct=totalPts>0?Math.round(earned/totalPts*100):0;
+  const{error}=await SB.from('responses').insert({
+    id:newId,questionnaire_id:curQ.id,
+    respondent_name:name,respondent_email:email,
+    answers:JSON.parse(JSON.stringify(rAns)),
+    final_score:pending===0?earned:null,
+    total_points:totalPts,score_pct:pending===0?pct:null,
+    graded:pending===0
+  });
+  if(error){btn.disabled=false;btn.innerHTML='✓ Envoyer mes réponses';toast('Erreur: '+error.message,'error');return;}
+  const _m=pending===0?getMention(pct):null;
+  const _parts=[];
   if(pending===0){
-    const pct=totalPts>0?Math.round(earned/totalPts*100):0;
-    await SB.from('responses').update({final_score:earned,total_points:totalPts,score_pct:pct,graded:true}).eq('id',insertedId);
-  }
-  // Afficher le résultat
-  let resultHTML='';
-  if(pending===0){
-    const pct=totalPts>0?Math.round(earned/totalPts*100):0;
-    const mention=getMention(pct);
-    const mentionColors={
-      'Excellent':'background:#eaf3de;color:#3b6d11',
-      'Bien':'background:#e6f1fb;color:#185fa5',
-      'Assez bien':'background:#e1f5ee;color:#0f6e56',
-      'Passable':'background:#faeeda;color:#854f0b',
-      'Insuffisant':'background:#fcebeb;color:#a32d2d'
-    };
-    const mStyle=mentionColors[mention.txt]||'';
-    resultHTML=[
-      '<div style="background:#1a1a18;color:#fff;border-radius:12px;padding:1.5rem;text-align:center;margin-bottom:1rem">',
-      '<div style="font-size:13px;opacity:.6;margin-bottom:.5rem">Votre résultat</div>',
-      '<div style="font-size:48px;font-weight:700;line-height:1">'+earned+'<span style="font-size:24px;opacity:.5"> / '+totalPts+'</span></div>',
-      '<div style="font-size:14px;opacity:.6;margin-top:.25rem">'+pct+'%</div>',
-      '<span style="font-size:13px;font-weight:500;padding:4px 14px;border-radius:99px;display:inline-block;margin-top:.75rem;'+mStyle+'">'+mention.txt+'</span>',
-      '</div>'
-    ].join('');
+    _parts.push('<div class="score-box"><div style="font-size:13px;opacity:.6;margin-bottom:.5rem">Votre résultat</div>');
+    _parts.push('<div class="score-num">'+earned+'<span style="font-size:22px;opacity:.5"> / '+totalPts+'</span></div>');
+    _parts.push('<div class="score-pct">'+pct+'%</div>');
+    _parts.push('<span class="mention-badge" style="background:'+_m.bg+';color:'+_m.fg+'">'+_m.txt+'</span></div>');
   } else {
-    resultHTML=[
-      '<div style="background:#e6f1fb;border:.5px solid #85b7eb;border-radius:12px;padding:1.25rem;text-align:center;margin-bottom:1rem">',
-      '<div style="font-size:15px;font-weight:500;color:#185fa5">&#10003; Réponses enregistrées</div>',
-      '<div style="font-size:13px;color:#185fa5;margin-top:.25rem">Votre note sera disponible après correction.</div>',
-      '</div>'
-    ].join('');
+    _parts.push('<div style="background:#e6f1fb;border:.5px solid #85b7eb;border-radius:12px;padding:1.25rem;text-align:center;margin-bottom:1rem">');
+    _parts.push('<div style="font-size:15px;font-weight:500;color:#185fa5">&#10003; Réponses envoyées</div>');
+    _parts.push('<div style="font-size:13px;color:#185fa5;margin-top:.25rem">Votre note sera disponible après correction.</div></div>');
   }
-  const finalHTML=[
-    resultHTML,
-    '<div style="text-align:center;padding:1rem 2rem 3rem">',
-    '<div style="font-size:16px;font-weight:500;margin-bottom:.25rem">Merci '+esc(name)+' !</div>',
-    '<div style="font-size:13px;color:#5f5e5a;margin-bottom:1.5rem">Vos réponses ont bien été enregistrées.</div>',
-    '<button class="btn" onclick="goHome()">&#8592; Retour</button>',
-    '</div>'
-  ].join('');
-  document.getElementById('r-content').innerHTML=finalHTML;
+  _parts.push('<div style="text-align:center;padding:1rem 2rem 2rem">');
+  _parts.push('<div style="font-size:15px;font-weight:500;margin-bottom:.25rem">Merci '+esc(name)+' !</div>');
+  _parts.push('<div style="font-size:13px;color:#5f5e5a;margin-bottom:1.25rem">Réponses bien enregistrées.</div>');
+  _parts.push('<button class="btn" onclick="goHome()">&#8592; Retour</button></div>');
+  document.getElementById('r-content').innerHTML=_parts.join('');
+}
+
+function goHome(){document.getElementById('respondent-app').style.display='none';document.getElementById('login-screen').style.display='flex';}
+function showRespErr(msg){
+  document.getElementById('respondent-app').style.display='block';
+  document.getElementById('r-title').textContent='Questionnaire';
+  const el=document.getElementById('r-content');
+  el.innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">&#9888;</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Indisponible</div><div style="font-size:14px;color:#5f5e5a">'+msg+'</div></div>';
+}
+
+init();
+</script>
+</body>
+</html>
