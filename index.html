@@ -6,6 +6,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1488,7 +1489,7 @@ async function saveQuestionnaire(){
 // ─── RESPONSES ────────────────────────────────────────
 async function renderResponses(){
   document.getElementById('tb-title').textContent='Réponses';
-  document.getElementById('tb-actions').innerHTML=`<button class="btn btn-sm" onclick="exportAllCSV()">⬇ Exporter tout</button>`;
+  document.getElementById('tb-actions').innerHTML=`<button class="btn btn-sm" onclick="exportAllXLSX()">&#11015; Exporter XLSX</button>`;
   document.getElementById('content').innerHTML=loading();
   const[{data:rs},{data:qs}]=await Promise.all([SB.from('responses').select('*').order('created_at',{ascending:false}),SB.from('questionnaires').select('id,title')]);
   updateBadges();
@@ -1742,12 +1743,142 @@ function exportQCSV(q,rs){
   dlCSV(rows,'reponses_'+q.title.replace(/\s+/g,'_').slice(0,30)+'_'+new Date().toISOString().slice(0,10));
 }
 
-async function exportAllCSV(){
-  const[{data:qs},{data:rs}]=await Promise.all([SB.from('questionnaires').select('*'),SB.from('responses').select('*')]);
-  if(!(rs||[]).length){toast('Aucune réponse.','error');return;}
-  const rows=[['Questionnaire','Nom','Email','Date','Question','Réponse']];
-  (rs||[]).forEach(r=>{const q=(qs||[]).find(x=>x.id===r.questionnaire_id);(q?q.questions:[]).forEach(qq=>{const ans=(r.answers||{})[qq.id];if(qq.type==='table'&&ans&&ans.rows){ans.rows.forEach(tr=>rows.push([q.title,r.respondent_name,r.respondent_email,fmt(r.created_at),qq.label||'Tableau',[tr.phrase,...(qq.columns||[]).map((_,ci)=>(tr.cols&&tr.cols[ci])||'')].join(' | ')]));}else rows.push([q?q.title:'?',r.respondent_name,r.respondent_email,fmt(r.created_at),qq.label||qq.type,Array.isArray(ans)?ans.join(', '):String(ans||'')]);});});
-  dlCSV(rows,'toutes_reponses_'+new Date().toISOString().slice(0,10));
+async function exportAllXLSX(){
+  const btn=document.querySelector('[onclick="exportAllXLSX()"]');
+  if(btn){btn.disabled=true;btn.textContent='Génération...';}
+  try{
+    if(typeof XLSX==='undefined'){toast('SheetJS non chargé. Rechargez la page.','error');return;}
+    const[{data:qs},{data:rs}]=await Promise.all([
+      SB.from('questionnaires').select('*'),
+      SB.from('responses').select('*').order('created_at',{ascending:false})
+    ]);
+    if(!(rs||[]).length){toast('Aucune réponse à exporter.','error');return;}
+
+    const wb=XLSX.utils.book_new();
+
+    // ── Feuille 1 : Résumé général ─────────────────────
+    const summaryRows=[
+      ['EvalPro — Export des résultats'],
+      ['Généré le',new Date().toLocaleString('fr-FR')],
+      [''],
+      ['Questionnaire','Répondant','Email','Genre','Fonction','Structure','Date soumission','Note /pts','%','Mention','Statut correction']
+    ];
+    (rs||[]).forEach(r=>{
+      const q=(qs||[]).find(x=>x.id===r.questionnaire_id);
+      const mention=r.score_pct!=null?getMention(r.score_pct).txt:'—';
+      const members=r.group_members&&r.group_members.length>0?r.group_members:[{name:r.respondent_name,email:r.respondent_email,genre:'',fonction:'',structure:''}];
+      members.forEach(m=>{
+        summaryRows.push([
+          q?q.title:'(supprimé)',
+          m.name||r.respondent_name,
+          m.email||r.respondent_email,
+          m.genre||'',
+          m.fonction||'',
+          m.structure||'',
+          fmt(r.created_at),
+          r.final_score!=null?(r.final_score+' / '+(r.total_points||'?')):'En attente',
+          r.score_pct!=null?(r.score_pct+'%'):'—',
+          mention,
+          r.graded?'Corrigé':'En attente de correction'
+        ]);
+      });
+    });
+    const wsSum=XLSX.utils.aoa_to_sheet(summaryRows);
+    // Largeurs colonnes
+    wsSum['!cols']=[{wch:35},{wch:25},{wch:30},{wch:12},{wch:20},{wch:25},{wch:20},{wch:12},{wch:8},{wch:15},{wch:22}];
+    // Style titre
+    if(wsSum['A1']) wsSum['A1'].s={font:{bold:true,sz:14}};
+    XLSX.utils.book_append_sheet(wb,wsSum,'Résumé général');
+
+    // ── Feuille 2 : Réponses détaillées ────────────────
+    const detailRows=[
+      ['Questionnaire','Répondant','Email','Date','N°','Question','Type','Réponse','Note obtenue','Note max','Correct','Commentaire']
+    ];
+    (rs||[]).forEach(r=>{
+      const q=(qs||[]).find(x=>x.id===r.questionnaire_id);
+      const qTitle=q?q.title:'(supprimé)';
+      const name=r.respondent_name;
+      const email=r.respondent_email;
+      const date=fmt(r.created_at);
+      (q?q.questions:[]).forEach((qq,i)=>{
+        const ans=(r.answers||{})[qq.id];
+        const manSc=(r.manual_scores||{})[qq.id];
+        const autoSc=q?autoGrade(q,r.answers||{}):{}
+        const sc=manSc!==undefined?manSc:(autoSc[qq.id]!==undefined?autoSc[qq.id]:null);
+        const maxPts=qq.type==='table'?calcTotalPts({questions:[qq]}):(qq.points||0);
+        let ansStr='';
+        let correct='';
+        if(qq.type==='table'&&ans&&ans.rows){
+          ans.rows.forEach(rw=>{
+            const rowStr=(rw.phrase||'')+(rw.cols&&rw.cols.length?' | '+rw.cols.filter(Boolean).join(' | '):'');
+            detailRows.push([qTitle,name,email,date,i+1,qq.label||'Tableau','Tableau',rowStr,sc!=null?sc:'',maxPts,'','']);
+          });
+          return;
+        } else if(Array.isArray(ans)){
+          ansStr=ans.join(', ');
+        } else if(ans!=null){
+          ansStr=String(ans);
+        }
+        // Vérifier si correct
+        if(qq.type==='qcm'&&qq.correctAnswer!=null){
+          const correctAns=qq.options&&qq.options[qq.correctAnswer];
+          correct=ans===correctAns?'Oui':'Non';
+        } else if(qq.type==='yesno'&&qq.correctAnswer){
+          correct=ans===qq.correctAnswer?'Oui':'Non';
+        }
+        const comment=(r.comments||{})[qq.id]||'';
+        detailRows.push([qTitle,name,email,date,i+1,qq.label||qq.type,qq.type,ansStr,sc!=null?sc:'',maxPts,correct,comment]);
+      });
+    });
+    const wsDet=XLSX.utils.aoa_to_sheet(detailRows);
+    wsDet['!cols']=[{wch:30},{wch:20},{wch:28},{wch:18},{wch:5},{wch:35},{wch:12},{wch:40},{wch:12},{wch:10},{wch:10},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,wsDet,'Réponses détaillées');
+
+    // ── Feuille 3 : Par questionnaire ──────────────────
+    const byQ={};
+    (rs||[]).forEach(r=>{
+      const q=(qs||[]).find(x=>x.id===r.questionnaire_id);
+      if(!q) return;
+      if(!byQ[q.id]) byQ[q.id]={q,responses:[]};
+      byQ[q.id].responses.push(r);
+    });
+    Object.values(byQ).forEach(({q,responses})=>{
+      const headers=['Répondant','Email','Date','Note','%','Mention'];
+      (q.questions||[]).forEach(qq=>{headers.push(qq.label||qq.type);});
+      const sheetRows=[headers];
+      responses.forEach(r=>{
+        const mention=r.score_pct!=null?getMention(r.score_pct).txt:'—';
+        const row=[
+          r.respondent_name,r.respondent_email,fmt(r.created_at),
+          r.final_score!=null?r.final_score:'',
+          r.score_pct!=null?(r.score_pct+'%'):'',
+          mention
+        ];
+        (q.questions||[]).forEach(qq=>{
+          const ans=(r.answers||{})[qq.id];
+          if(qq.type==='table'&&ans&&ans.rows){
+            row.push(ans.rows.map(rw=>(rw.phrase||"")+(rw.cols&&rw.cols.length?" | "+rw.cols.join(" | "):"")).join(" // "));
+          } else {
+            row.push(Array.isArray(ans)?ans.join(', '):(ans!=null?String(ans):''));
+          }
+        });
+        sheetRows.push(row);
+      });
+      const wsQ=XLSX.utils.aoa_to_sheet(sheetRows);
+      const sheetName=q.title.replace(/[:\\/?*\[\]]/g,'').slice(0,31);
+      XLSX.utils.book_append_sheet(wb,wsQ,sheetName||'Questionnaire');
+    });
+
+    // ── Téléchargement ─────────────────────────────────
+    const fname='EvalPro_Resultats_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    XLSX.writeFile(wb,fname);
+    toast('Export XLSX téléchargé : '+fname);
+  }catch(e){
+    console.error('Export XLSX error:',e);
+    toast('Erreur export: '+e.message,'error');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='&#11015; Exporter XLSX';}
+  }
 }
 
 function dlCSV(rows,name){
@@ -1790,7 +1921,7 @@ function renderSettings(){
     <div class="card"><div class="sec-title">Export</div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
         <div><div style="font-size:14px;font-weight:500">Exporter toutes les réponses (CSV)</div></div>
-        <button class="btn btn-sm" onclick="exportAllCSV()">⬇ Exporter</button>
+        <button class="btn btn-sm" onclick="exportAllXLSX()">&#11015; Exporter XLSX</button>
       </div>
     </div>
     <div class="card"><div class="sec-title">Apparence</div>
