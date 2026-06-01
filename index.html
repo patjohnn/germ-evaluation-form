@@ -410,6 +410,8 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
   require_signature boolean default false,
   duration integer default 0,
   duration_unit text default 'minutes',
+  start_at timestamptz,
+  end_at timestamptz,
   emailjs_service text,
   emailjs_template text,
   emailjs_key text,
@@ -655,6 +657,25 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       <div class="fgroup" style="margin-bottom:0;display:flex;align-items:flex-end">
         <div style="font-size:11px;color:var(--text3);padding-bottom:6px">0 = pas de limite de temps</div>
       </div>
+    </div>
+    <div style="background:var(--bg2);border:.5px solid var(--border);border-radius:var(--rl);padding:1rem;margin-bottom:1rem">
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:.75rem">&#128197; Planification de l'évaluation <span style="font-weight:400;color:var(--text3)">(optionnel)</span></div>
+      <div class="frow2" style="margin-bottom:.75rem">
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Date et heure de début</label>
+          <input type="datetime-local" id="q-start-at">
+        </div>
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Date et heure de fin</label>
+          <input type="datetime-local" id="q-end-at">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.5">
+        Laissez vide pour aucune restriction de période. Si défini, les répondants ne pourront accéder au formulaire qu'entre ces deux dates.
+      </div>
+    </div>
+    <div class="frow3" style="margin-bottom:1rem;display:none"><!-- placeholder --></div>
+    <div class="frow3" style="margin-bottom:1rem">
     </div>
     <div class="fgroup" style="margin-bottom:1rem">
       <label class="flabel">EmailJS — envoi PDF automatique <span style="font-weight:400;color:var(--text3)">(optionnel, emailjs.com gratuit)</span></label>
@@ -908,7 +929,13 @@ async function renderQuestionnaires(){
       <td><span class="badge ${TC[q.type]||'bg-gray'}">${TL[q.type]||q.type}</span></td>
       <td>${(q.questions||[]).length}</td>
       <td><button class="btn btn-xs" onclick="viewResponses('${q.id}')">${qrs}</button></td>
-      <td style="font-size:12px;color:var(--text3)">${fmt(q.created_at)}</td>
+      <td style="font-size:12px;color:var(--text3)">
+          ${q.start_at||q.end_at?
+            '<span style="font-size:11px;background:var(--blue-bg);color:var(--blue-text);padding:2px 7px;border-radius:99px">&#128197; '+
+            (q.start_at?'Deb: '+fmt(q.start_at):'')+(q.start_at&&q.end_at?' · ':'')+(q.end_at?'Fin: '+fmt(q.end_at):'')+
+            '</span>'
+            :fmt(q.created_at)}
+        </td>
       <td><span class="badge ${q.active?'bg-green':'bg-gray'}" style="cursor:pointer" onclick="toggleActive('${q.id}',${!q.active})">${q.active?'✓ Actif':'⏸ Inactif'}</span></td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-xs" onclick="shareQ(\'${q.id}\',\'${q.code}\')" title="Partager">🔗</button>
@@ -1029,6 +1056,8 @@ function openQModal(qid){
   document.getElementById('q-require-sig').value='0';
   document.getElementById('q-duration').value='0';
   document.getElementById('q-duration-unit').value='minutes';
+  document.getElementById('q-start-at').value='';
+  document.getElementById('q-end-at').value='';
   document.getElementById('q-type').value='mixed';
   document.getElementById('q-builder').innerHTML='';
   if(!qid){updateBEmpty();openModal('modal-q');return;}
@@ -1043,6 +1072,8 @@ function openQModal(qid){
       document.getElementById('q-require-sig').value=q.require_signature?'1':'0';
       document.getElementById('q-duration').value=q.duration||0;
       document.getElementById('q-duration-unit').value=q.duration_unit||'minutes';
+      document.getElementById('q-start-at').value=q.start_at?q.start_at.slice(0,16):'';
+      document.getElementById('q-end-at').value=q.end_at?q.end_at.slice(0,16):'';
       document.getElementById('q-emailjs-service').value=q.emailjs_service||'';
       document.getElementById('q-emailjs-template').value=q.emailjs_template||'';
       document.getElementById('q-emailjs-key').value=q.emailjs_key||'';
@@ -1476,6 +1507,8 @@ async function saveQuestionnaire(){
     require_signature:+document.getElementById('q-require-sig').value===1,
     duration:+document.getElementById('q-duration').value||0,
     duration_unit:document.getElementById('q-duration-unit').value,
+    start_at:document.getElementById('q-start-at').value||null,
+    end_at:document.getElementById('q-end-at').value||null,
     emailjs_service:document.getElementById('q-emailjs-service').value.trim(),
     emailjs_template:document.getElementById('q-emailjs-template').value.trim(),
     emailjs_key:document.getElementById('q-emailjs-key').value.trim()
@@ -1954,6 +1987,41 @@ async function loadRespondentByCode(code){
   hideLov();
   if(error||!q){toast('Code invalide ou questionnaire introuvable.','error');if(!document.getElementById('login-screen').style.display||document.getElementById('login-screen').style.display==='none')document.getElementById('login-screen').style.display='flex';return;}
   if(!q.active){toast('Ce questionnaire n\'accepte plus de réponses.','info');document.getElementById('login-screen').style.display='flex';return;}
+  // ─ Vérification planification ─
+  const _now=new Date();
+  const _fmt=d=>{const o={day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'};return new Date(d).toLocaleDateString('fr-FR',o);};
+  if(q.start_at && _now < new Date(q.start_at)){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('respondent-app').style.display='block';
+    document.getElementById('r-title').textContent=q.title;
+    document.getElementById('r-sub').textContent='';
+    document.getElementById('r-content').innerHTML=
+      '<div style="text-align:center;padding:3rem 1rem;max-width:480px;margin:0 auto">'
+      +'<div style="font-size:56px;margin-bottom:1rem">&#9200;</div>'
+      +'<div style="font-size:20px;font-weight:700;margin-bottom:.5rem">Évaluation pas encore ouverte</div>'
+      +'<div style="font-size:14px;color:var(--text2);margin-bottom:1.5rem">Cette évaluation débutera le :</div>'
+      +'<div style="background:linear-gradient(135deg,#6c63ff,#8b5cf6);color:#fff;border-radius:16px;padding:1.25rem 2rem;font-size:18px;font-weight:700;display:inline-block;margin-bottom:1.5rem">&#128197; '+_fmt(q.start_at)+'</div>'
+      +'<div style="font-size:13px;color:var(--text2)">Revenez à cette date et heure pour participer.</div>'
+      +'<button class="btn" onclick="goHome()" style="margin-top:1.5rem">&#8592; Retour</button>'
+      +'</div>';
+    return;
+  }
+  if(q.end_at && _now > new Date(q.end_at)){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('respondent-app').style.display='block';
+    document.getElementById('r-title').textContent=q.title;
+    document.getElementById('r-sub').textContent='';
+    document.getElementById('r-content').innerHTML=
+      '<div style="text-align:center;padding:3rem 1rem;max-width:480px;margin:0 auto">'
+      +'<div style="font-size:56px;margin-bottom:1rem">&#128683;</div>'
+      +'<div style="font-size:20px;font-weight:700;margin-bottom:.5rem">Évaluation terminée</div>'
+      +'<div style="font-size:14px;color:var(--text2);margin-bottom:1.5rem">Cette évaluation a pris fin le :</div>'
+      +'<div style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border-radius:16px;padding:1.25rem 2rem;font-size:18px;font-weight:700;display:inline-block;margin-bottom:1.5rem">&#128197; '+_fmt(q.end_at)+'</div>'
+      +'<div style="font-size:13px;color:var(--text2)">La participation est terminee.</div>'
+      +'<button class="btn" onclick="goHome()" style="margin-top:1.5rem">&#8592; Retour</button>'
+      +'</div>';
+    return;
+  }
   openRView(q);
 }
 
@@ -2065,6 +2133,8 @@ function _renderRContent(q,qs,isGroup,requireSig,refHtml,descHtml){
     window._autoSave = setInterval(()=>saveProgress(curQ.id), 15000);
     // Démarrer le timer si durée définie
     if(curQ.duration && +curQ.duration > 0) startTimer(curQ);
+    // Vérification countdown vers end_at
+    if(curQ.end_at) startEndAtCountdown(curQ);
   }, 100);
 }
 
@@ -3875,6 +3945,34 @@ function copyHash(){
       document.execCommand('copy');ta.remove();
       toast('Hash copié !');
     });
+}
+
+// ─── COUNTDOWN FIN D'ÉVALUATION ─────────────────────
+function startEndAtCountdown(q){
+  if(!q.end_at) return;
+  const endDate = new Date(q.end_at);
+  const bar = document.getElementById('r-sub');
+  clearInterval(window._endAtInterval);
+  window._endAtInterval = setInterval(()=>{
+    const left = endDate - new Date();
+    if(left <= 0){
+      clearInterval(window._endAtInterval);
+      if(bar) bar.innerHTML = '<span style="color:#ff6b6b;font-weight:600">&#128683; Evaluation terminee — soumission automatique</span>';
+      setTimeout(submitR, 2000);
+      return;
+    }
+    const h=Math.floor(left/3600000), mn=Math.floor((left%3600000)/60000), s=Math.floor((left%60000)/1000);
+    const str=h>0?h+'h '+mn+'m '+s+'s':(mn>0?mn+'m '+s+'s':s+'s');
+    const pct=Math.round(left/((endDate-new Date(q.start_at||Date.now()-86400000))*1000)*100);
+    const col=left<300000?'#ff6b6b':left<900000?'#ffd93d':'#6bcb77';
+    const urgent=left<300000?' — Moins de 5 min !':'';
+    if(bar){
+      // Ne pas écraser le timer de durée s'il est actif
+      if(!document.getElementById('r-sub').querySelector?.('.duration-timer')){
+        bar.innerHTML='<span style="color:'+col+';font-weight:600">&#128197; Fermeture dans : '+str+urgent+'</span>';
+      }
+    }
+  }, 1000);
 }
 
 // ─── DARK MODE ────────────────────────────────────── ────────────────────────────────────────
