@@ -2535,7 +2535,7 @@ function showResultDetail(rIdx,qIdx){
   // Bouton PDF
   if(isGraded){
     html+='<div style="text-align:center;margin-top:1.5rem">';
-    html+='<button class="pdf-btn" onclick="downloadResultPDF(''+r.id+'')">📄 Télécharger mon résumé PDF</button>';
+    html+='<button class="pdf-btn" data-rid="'+r.id+'" onclick="downloadResultPDF(this.dataset.rid)">&#128196; Télécharger mon résumé PDF</button>';
     html+='</div>';
   }
 
