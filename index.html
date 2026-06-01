@@ -2414,7 +2414,7 @@ function renderMyResults(responses,questionnaires,email){
     html+='<div style="display:flex;gap:8px;justify-content:flex-end">';
     html+='<button class="btn btn-sm" onclick="showResultDetail('+idx+','+JSON.stringify(questionnaires.findIndex(x=>x.id===r.questionnaire_id))+')" data-ridx="'+idx+'">Voir le détail →</button>';
     if(isGraded){
-      html+='<button class="pdf-btn" style="padding:6px 14px;font-size:12px" onclick="downloadResultPDF(''+r.id+'')">📄 PDF</button>';
+      html+='<button class="pdf-btn" style="padding:6px 14px;font-size:12px" data-rid="'+r.id+'" onclick="downloadResultPDF(this.dataset.rid)">&#128196; PDF</button>';
     }
     html+='</div>';
     html+='</div>';
