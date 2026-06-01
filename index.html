@@ -20,6 +20,17 @@
   --teal-bg:#e1f5ee;--teal-text:#0f6e56;--teal-border:#5dcaa5;
   --r:8px;--rl:12px;--rxl:16px;
 }
+[data-theme="dark"]{
+  --bg:#1a1a2e;--bg2:#16213e;--bg3:#0f3460;--bg4:#0a2444;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.15);--border3:rgba(255,255,255,.25);
+  --text:#e8e8f0;--text2:#a8a8c0;--text3:#6868a0;--text4:#404080;
+  --green-bg:#0d2d1a;--green-text:#4ade80;--green-border:#166534;
+  --red-bg:#2d0d0d;--red-text:#f87171;--red-border:#7f1d1d;
+  --blue-bg:#0d1d2d;--blue-text:#60a5fa;--blue-border:#1e3a5f;
+  --amber-bg:#2d1f0d;--amber-text:#fbbf24;--amber-border:#78350f;
+  --purple-bg:#1a0d2d;--purple-text:#c084fc;--purple-border:#581c87;
+  --teal-bg:#0d2d24;--teal-text:#34d399;--teal-border:#065f46;
+}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;color:var(--text);background:var(--bg2);min-height:100vh}
 /* layout */
 #app{display:flex;min-height:100vh}
@@ -178,6 +189,56 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
 #respondent-app{min-height:100vh;background:var(--bg2)}
 .r-header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5rem;height:52px;display:flex;align-items:center;justify-content:space-between}
 .r-content{max-width:740px;margin:0 auto;padding:1.75rem 1rem 4rem}
+/* Dark mode overrides pour les couleurs hardcodées */
+[data-theme="dark"] body{background:var(--bg2)}
+[data-theme="dark"] #sidebar{background:var(--bg);border-color:var(--border)}
+[data-theme="dark"] #topbar{background:var(--bg);border-color:var(--border)}
+[data-theme="dark"] .card{background:var(--bg);border-color:var(--border)}
+[data-theme="dark"] .modal{background:var(--bg)}
+[data-theme="dark"] .dtbl td{border-color:var(--border)}
+[data-theme="dark"] .dtbl th{border-color:var(--border2)}
+[data-theme="dark"] .dtbl tr:hover td{background:var(--bg2)}
+[data-theme="dark"] .resp-item{background:var(--bg2);border-color:var(--border)}
+[data-theme="dark"] .corr-row{background:var(--bg2);border-color:var(--border)}
+[data-theme="dark"] .corr-answer{background:var(--bg3)}
+[data-theme="dark"] .q-block{background:var(--bg);border-color:var(--border)}
+[data-theme="dark"] .login-card{background:var(--bg)}
+[data-theme="dark"] #login-screen{background:var(--bg2)}
+[data-theme="dark"] .stat-card{background:var(--bg)}
+[data-theme="dark"] .score-box{background:linear-gradient(135deg,#0f3460,#1a1a2e)}
+[data-theme="dark"] .q-card{background:var(--bg);box-shadow:0 2px 12px rgba(0,0,0,.3)}
+[data-theme="dark"] .info-card{background:linear-gradient(135deg,#0f3460,#1a1a2e)}
+[data-theme="dark"] .ref-box{background:var(--bg2);border-color:var(--border)}
+[data-theme="dark"] input[type=text],[data-theme="dark"] input[type=email],
+[data-theme="dark"] input[type=password],[data-theme="dark"] input[type=number],
+[data-theme="dark"] textarea,[data-theme="dark"] select{
+  background:var(--bg3);border-color:var(--border2);color:var(--text)
+}
+[data-theme="dark"] input:focus,[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus{background:var(--bg2)}
+[data-theme="dark"] .btn{background:var(--bg2);border-color:var(--border2);color:var(--text)}
+[data-theme="dark"] .btn:hover{background:var(--bg3)}
+[data-theme="dark"] .btn-primary{background:var(--text);color:var(--bg)}
+[data-theme="dark"] .nav-item:hover{background:var(--bg2)}
+[data-theme="dark"] .nav-item.active{background:var(--bg3)}
+[data-theme="dark"] .modal-overlay{background:rgba(0,0,0,.7)}
+[data-theme="dark"] .setup-wrap .card{background:var(--bg)}
+[data-theme="dark"] pre{background:var(--bg3);color:var(--text2)}
+[data-theme="dark"] code{background:var(--bg3);color:var(--text2)}
+[data-theme="dark"] .sb-logo,[data-theme="dark"] .sb-footer{border-color:var(--border)}
+[data-theme="dark"] .sb-nav{scrollbar-color:var(--border) transparent}
+[data-theme="dark"] #respondent-app{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)}
+[data-theme="dark"] .r-header{background:linear-gradient(90deg,#0a0a1a,#0f1a2e)}
+/* Toggle button */
+.dark-toggle{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 10px;border-radius:99px;
+  background:var(--bg3);border:.5px solid var(--border2);
+  cursor:pointer;font-size:12px;color:var(--text2);
+  font-family:inherit;transition:all .2s;
+}
+.dark-toggle:hover{background:var(--bg2);color:var(--text)}
+
 @media(max-width:768px){
   #sidebar{display:none}#main{margin-left:0}
   .frow2,.frow3{grid-template-columns:1fr}
@@ -387,6 +448,9 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       <div class="sb-footer">
         <div class="sb-uname">Administrateur</div>
         <div class="sb-uinfo">EvalPro · Supabase ☁️</div>
+        <button class="dark-toggle" onclick="toggleDark()" id="dark-btn" style="margin-top:.75rem;width:100%;justify-content:center">
+          <span id="dark-icon">🌙</span> <span id="dark-label">Mode sombre</span>
+        </button>
       </div>
     </div>
     <div id="main">
@@ -400,7 +464,10 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
 <div id="respondent-app" style="display:none">
   <div class="r-header">
     <div style="font-size:14px;font-weight:600" id="r-title">Questionnaire</div>
-    <div style="font-size:12px;color:var(--text3)" id="r-sub"></div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="font-size:12px;color:rgba(255,255,255,.6)" id="r-sub"></div>
+      <button onclick="toggleDark()" style="background:rgba(255,255,255,.1);border:.5px solid rgba(255,255,255,.2);color:#fff;border-radius:99px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit" id="r-dark-btn">🌙</button>
+    </div>
   </div>
   <div class="r-content" id="r-content"></div>
 </div>
@@ -617,6 +684,8 @@ function savePwd(){
 function navigate(view){
   ['dashboard','questionnaires','responses','settings'].forEach(v=>{const el=document.getElementById('nav-'+v);if(el)el.className='nav-item'+(v===view?' active':'');});
   ({dashboard:renderDashboard,questionnaires:renderQuestionnaires,responses:renderResponses,settings:renderSettings})[view]?.();
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  updateDarkBtn(isDark);
 }
 async function updateBadges(){
   const[{data:qs},{data:rs}]=await Promise.all([SB.from('questionnaires').select('id'),SB.from('responses').select('id')]);
@@ -1418,6 +1487,17 @@ function renderSettings(){
         <div><div style="font-size:14px;font-weight:500">Exporter toutes les réponses (CSV)</div></div>
         <button class="btn btn-sm" onclick="exportAllCSV()">⬇ Exporter</button>
       </div>
+    </div>
+    <div class="card"><div class="sec-title">Apparence</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+        <div>
+          <div style="font-size:14px;font-weight:500">Thème de l&#39;interface</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">Le choix est sauvegardé automatiquement.</div>
+        </div>
+        <button class="dark-toggle" onclick="toggleDark()" style="padding:8px 16px">
+          <span id="dark-icon">🌙</span> <span id="dark-label">Mode sombre</span>
+        </button>
+      </div>
     </div>`;
 }
 
@@ -2133,6 +2213,39 @@ function showRespErr(msg){
   el.innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">&#9888;</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Indisponible</div><div style="font-size:14px;color:#5f5e5a">'+msg+'</div></div>';
 }
 
+// ─── DARK MODE ────────────────────────────────────────
+function initDarkMode(){
+  const saved=localStorage.getItem('evalpro_theme');
+  if(saved==='dark'){
+    document.documentElement.setAttribute('data-theme','dark');
+    updateDarkBtn(true);
+  }
+}
+
+function toggleDark(){
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  if(isDark){
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('evalpro_theme','light');
+    updateDarkBtn(false);
+  } else {
+    document.documentElement.setAttribute('data-theme','dark');
+    localStorage.setItem('evalpro_theme','dark');
+    updateDarkBtn(true);
+  }
+}
+
+function updateDarkBtn(isDark){
+  const icon=document.getElementById('dark-icon');
+  const label=document.getElementById('dark-label');
+  const rBtn=document.getElementById('r-dark-btn');
+  if(icon) icon.textContent=isDark?'☀️':'🌙';
+  if(label) label.textContent=isDark?'Mode clair':'Mode sombre';
+  if(rBtn) rBtn.textContent=isDark?'☀️':'🌙';
+}
+
+
+initDarkMode();
 init();
 </script>
 </body>
