@@ -475,10 +475,12 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     <div class="fgroup"><label class="flabel">Mot de passe</label><input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Se connecter</button>
     <div id="login-debug" style="display:none;margin-top:1rem;background:#f8f8f8;border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;font-family:monospace"></div>
-    <div style="margin-top:1rem;padding-top:1rem;border-top:.5px solid var(--border)">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:.5rem;text-align:center">Pas encore de compte ? Créez le premier compte administrateur :</div>
+    <div id="first-setup-section" style="display:none;margin-top:1rem;padding-top:1rem;border-top:.5px solid var(--border)">
+      <div style="background:var(--amber-bg);color:var(--amber-text);font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:.75rem">
+        &#9888; Aucun compte administrateur n'existe encore. Créez le premier compte.
+      </div>
       <div class="fgroup" style="margin-bottom:.5rem"><label class="flabel">Votre nom</label><input type="text" id="setup-name" placeholder="Ex: Jean Konan"></div>
-      <button class="btn" style="width:100%;justify-content:center" onclick="createFirstAdmin()">&#128100; Créer mon compte admin</button>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="createFirstAdmin()">&#128100; Créer le premier compte admin</button>
       <div id="setup-result" style="display:none;margin-top:.5rem;font-size:12px;border-radius:6px;padding:8px"></div>
     </div>
     <div id="hash-helper" style="display:none;margin-top:1rem;background:var(--bg2);border-radius:8px;padding:12px">
@@ -772,6 +774,7 @@ async function init(){
     if(shareToken){ await loadSharedResult(shareToken); return; }
     if(code){ await loadRespondentByCode(code); return; }
     document.getElementById('login-screen').style.display='flex';
+    checkFirstSetup();
   }catch(e){
     hideLov();
     if(code){
@@ -3341,6 +3344,20 @@ function showShareError(msg){
     '<div style="text-align:center;padding:4rem 1rem"><div style="font-size:48px;margin-bottom:1rem">&#128683;</div><div style="font-size:16px;font-weight:600;margin-bottom:.5rem">'+esc(msg)+'</div><button class="btn" onclick="goHome()">&#8592; Retour</button></div>';
 }
 
+// ─── VERIFICATION PREMIER DÉMARRAGE ─────────────────
+async function checkFirstSetup(){
+  if(!SB) return;
+  try{
+    const {data, error} = await SB.from('app_users').select('id').limit(1);
+    if(error) return; // Silencieux si la table n'existe pas encore
+    const isEmpty = !data || data.length === 0;
+    const section = document.getElementById('first-setup-section');
+    if(section) section.style.display = isEmpty ? 'block' : 'none';
+  }catch(e){
+    // Silencieux
+  }
+}
+
 // ─── CREATION PREMIER ADMIN ──────────────────────────
 async function createFirstAdmin(){
   const name = (document.getElementById('setup-name')?.value||'').trim();
@@ -3383,6 +3400,9 @@ async function createFirstAdmin(){
     if(error) throw error;
     setResult('Compte cree avec succes ! Connectez-vous maintenant.', true);
     toast('Compte cree ! Cliquez sur Se connecter.');
+    // Masquer la section — plus jamais accessible
+    const sec = document.getElementById('first-setup-section');
+    if(sec) sec.style.display='none';
   }catch(e){
     setResult('Erreur: '+e.message, false);
   }
