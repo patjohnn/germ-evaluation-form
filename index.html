@@ -1844,7 +1844,7 @@ const selSc = (qid, val) => {
   });
 };
 
-const uTA = (qid, ri, kci, val) => {
+function uTA(qid, ri, kci, val) {
   if (!rAns[qid]) rAns[qid] = {rows: []};
   if (!rAns[qid].rows[ri]) rAns[qid].rows[ri] = {phrase: '', cols: []};
   if (kci === 'phrase') {
@@ -1853,7 +1853,13 @@ const uTA = (qid, ri, kci, val) => {
     if (!rAns[qid].rows[ri].cols) rAns[qid].rows[ri].cols = [];
     rAns[qid].rows[ri].cols[kci] = val;
   }
-};
+}
+// Exposer les fonctions répondant à window pour les oninput inline
+window.selQCM = selQCM;
+window.togChk = togChk;
+window.selYN = selYN;
+window.selSc = selSc;
+window.uTA = uTA;
 
 // Membres du groupe
 let groupMembers=[{name:'',email:'',genre:'',fonction:'',structure:''}];
