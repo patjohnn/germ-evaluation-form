@@ -1997,10 +1997,41 @@ function addTRow(qid,colCount){
 }
 
 async function submitR(){
-  const name=document.getElementById('r-name').value.trim();
-  const email=document.getElementById('r-email').value.trim();
+  // Sauvegarder les valeurs des champs membres
+  _saveMemberValues();
+
+  // Lire le premier membre
+  const name = (document.getElementById('r-name-0')?.value || groupMembers[0]?.name || '').trim();
+  const email = (document.getElementById('r-email-0')?.value || groupMembers[0]?.email || '').trim();
   if(!name){toast('Veuillez entrer votre nom.','error');return;}
   if(!email||!email.includes('@')){toast('Email invalide.','error');return;}
+
+  // Mettre à jour groupMembers depuis les champs
+  groupMembers.forEach((_,mi)=>{
+    const n = document.getElementById('r-name-'+mi)?.value?.trim();
+    const e = document.getElementById('r-email-'+mi)?.value?.trim();
+    if(n) groupMembers[mi].name = n;
+    if(e) groupMembers[mi].email = e;
+    groupMembers[mi].genre = document.getElementById('r-genre-'+mi)?.value||'';
+    groupMembers[mi].fonction = document.getElementById('r-fonction-'+mi)?.value||'';
+    groupMembers[mi].structure = document.getElementById('r-structure-'+mi)?.value||'';
+  });
+
+  // Valider tous les membres
+  for(let mi=0;mi<groupMembers.length;mi++){
+    if(!groupMembers[mi].name){toast('Nom manquant pour le membre '+(mi+1)+'.','error');return;}
+    if(!groupMembers[mi].email||!groupMembers[mi].email.includes('@')){toast('Email invalide pour le membre '+(mi+1)+'.','error');return;}
+  }
+
+  // Vérifier max_attempts
+  if(curQ.max_attempts&&+curQ.max_attempts>0){
+    const{data:existing}=await SB.from('responses').select('id').eq('questionnaire_id',curQ.id).eq('respondent_email',email);
+    if(existing&&existing.length>=(+curQ.max_attempts)){
+      toast('Nombre maximum de soumissions atteint ('+curQ.max_attempts+').','error');return;
+    }
+  }
+
+  // Valider questions obligatoires
   const missing=(curQ.questions||[]).filter(qq=>{
     if(!qq.required)return false;
     const ans=rAns[qq.id];
@@ -2008,46 +2039,99 @@ async function submitR(){
     if(qq.type==='table')return!ans||!ans.rows||ans.rows.every(r=>!r.phrase&&(!r.cols||r.cols.every(c=>!c)));
     return!ans&&ans!==0;
   });
-  if(missing.length>0){missing.forEach(qq=>{const c=document.getElementById(`qcard-${qq.id}`);if(c){c.style.borderColor='var(--red-border)';setTimeout(()=>c.style.borderColor='',3000);}});toast(`${missing.length} question${missing.length>1?'s':''} obligatoire${missing.length>1?'s':''} sans réponse.`,'error');return;}
-  const btn=document.getElementById('submit-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Envoi...';
+  if(missing.length>0){
+    missing.forEach(qq=>{
+      const c=document.getElementById('qcard-'+qq.id);
+      if(c){c.style.borderColor='var(--red-border)';c.style.boxShadow='0 0 0 3px rgba(163,45,45,.15)';
+      setTimeout(()=>{c.style.borderColor='';c.style.boxShadow='';},3000);}
+    });
+    toast(missing.length+' question'+(missing.length>1?'s':'')+' obligatoire'+(missing.length>1?'s':'')+' sans réponse.','error');
+    return;
+  }
+
+  const btn=document.getElementById('submit-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Envoi...';
+
+  // Signature
+  const sigData=getSigData();
+
+  // Calcul note auto
   const newId=uid();
   const autoSc=autoGrade(curQ,rAns);
   let earned=0,pending=0,totalPts=calcTotalPts(curQ);
   (curQ.questions||[]).forEach(qq=>{
     const as=autoSc[qq.id];
     if(as!==null&&as!==undefined)earned+=+as;
-    else pending+=(qq.points||1);
+    else pending+=(qq.type==='table'?0:(qq.points||1));
   });
   const pct=totalPts>0?Math.round(earned/totalPts*100):0;
+
   const{error}=await SB.from('responses').insert({
     id:newId,questionnaire_id:curQ.id,
     respondent_name:name,respondent_email:email,
+    group_members:groupMembers,
     answers:JSON.parse(JSON.stringify(rAns)),
+    signature:sigData,
     final_score:pending===0?earned:null,
-    total_points:totalPts,score_pct:pending===0?pct:null,
+    total_points:totalPts,
+    score_pct:pending===0?pct:null,
     graded:pending===0
   });
-  if(error){btn.disabled=false;btn.innerHTML='✓ Envoyer mes réponses';toast('Erreur: '+error.message,'error');return;}
-  const _m=pending===0?getMention(pct):null;
-  const _parts=[];
-  if(pending===0){
-    _parts.push('<div class="score-box"><div style="font-size:13px;opacity:.6;margin-bottom:.5rem">Votre résultat</div>');
-    _parts.push('<div class="score-num">'+earned+'<span style="font-size:22px;opacity:.5"> / '+totalPts+'</span></div>');
-    _parts.push('<div class="score-pct">'+pct+'%</div>');
-    _parts.push('<span class="mention-badge" style="background:'+_m.bg+';color:'+_m.fg+'">'+_m.txt+'</span></div>');
-  } else {
-    _parts.push('<div style="background:#e6f1fb;border:.5px solid #85b7eb;border-radius:12px;padding:1.25rem;text-align:center;margin-bottom:1rem">');
-    _parts.push('<div style="font-size:15px;font-weight:500;color:#185fa5">&#10003; Réponses envoyées</div>');
-    _parts.push('<div style="font-size:13px;color:#185fa5;margin-top:.25rem">Votre note sera disponible après correction.</div></div>');
+  if(error){btn.disabled=false;btn.innerHTML='&#10003; Envoyer mes réponses';toast('Erreur: '+error.message,'error');return;}
+
+  // Nettoyer progression
+  clearProgress(curQ.id);
+  clearInterval(window._autoSave);
+  clearInterval(timerInterval);
+
+  // Envoyer PDF par email si configuré
+  const pdfBase64=generatePDF(curQ,groupMembers,rAns,sigData,pending===0?{earned,totalPts,pct}:null);
+  if(curQ.emailjs_service&&curQ.emailjs_key&&curQ.emailjs_template){
+    emailjs.init(curQ.emailjs_key);
+    const allEmails=[...new Set(groupMembers.map(m=>m.email).filter(e=>e&&e.includes('@')))];
+    for(const em of allEmails){
+      try{
+        await emailjs.send(curQ.emailjs_service,curQ.emailjs_template,{
+          to_email:em,
+          to_name:groupMembers.find(m=>m.email===em)?.name||em,
+          questionnaire_title:curQ.title,
+          score:pending===0?earned+'/'+totalPts+' pts ('+pct+'%)':'En attente de correction'
+        });
+      }catch(e){console.warn('Email non envoyé:',e);}
+    }
   }
-  _parts.push('<div style="text-align:center;padding:1rem 2rem 2rem">');
-  _parts.push('<div style="font-size:15px;font-weight:500;margin-bottom:.25rem">Merci '+esc(name)+' !</div>');
-  _parts.push('<div style="font-size:13px;color:#5f5e5a;margin-bottom:1.25rem">Réponses bien enregistrées.</div>');
-  _parts.push('<button class="btn" onclick="goHome()">&#8592; Retour</button></div>');
-  document.getElementById('r-content').innerHTML=_parts.join('');
+
+  // Affichage résultat
+  const m=pending===0?getMention(pct):null;
+  const parts=[];
+  if(pending===0){
+    parts.push('<div class="score-box">');
+    parts.push('<div style="font-size:13px;opacity:.6;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.05em">Votre résultat</div>');
+    parts.push('<div class="score-num">'+earned+'<span style="font-size:28px;opacity:.4"> / '+totalPts+'</span></div>');
+    parts.push('<div style="font-size:16px;opacity:.6;margin-top:.25rem">'+pct+'%</div>');
+    const w=Math.min(pct,100);
+    parts.push('<div style="background:rgba(255,255,255,.1);border-radius:99px;height:6px;margin:1rem auto;max-width:200px"><div style="background:linear-gradient(90deg,#6c63ff,#8b5cf6);width:'+w+'%;height:6px;border-radius:99px"></div></div>');
+    parts.push('<span style="font-size:13px;font-weight:700;padding:6px 18px;border-radius:99px;display:inline-block;margin-top:.5rem;background:'+m.bg+';color:'+m.fg+'">'+m.txt+'</span>');
+    parts.push('</div>');
+  } else {
+    parts.push('<div style="background:#e6f1fb;border:.5px solid #85b7eb;border-radius:16px;padding:1.5rem;text-align:center;margin-bottom:1rem">');
+    parts.push('<div style="font-size:32px;margin-bottom:.75rem">&#10003;</div>');
+    parts.push('<div style="font-size:16px;font-weight:600;color:#185fa5">Réponses enregistrées !</div>');
+    parts.push('<div style="font-size:13px;color:#185fa5;margin-top:.25rem">Votre note sera disponible après correction.</div>');
+    parts.push('</div>');
+  }
+  parts.push('<div style="text-align:center;padding:1rem 1rem 2rem">');
+  parts.push('<div style="font-size:16px;font-weight:600;margin-bottom:.25rem">Merci '+esc(name)+' !</div>');
+  parts.push('<div style="font-size:13px;color:#5f5e5a;margin-bottom:1.5rem">Vos réponses ont bien été enregistrées.</div>');
+  parts.push('<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">');
+  parts.push('<button class="btn" onclick="goHome()" style="border-radius:10px">&#8592; Retour</button>');
+  parts.push('<button class="pdf-btn" data-rid="'+newId+'" onclick="downloadResultPDF(this.dataset.rid)">&#128196; Télécharger mon résumé PDF</button>');
+  parts.push('</div></div>');
+  document.getElementById('r-content').innerHTML=parts.join('');
+  window._lastSigData=sigData;
 }
 
-// ─── MES RÉSULTATS ────────────────────────────────────
+
 function showScreen(id){
   ['login-screen','admin-app','respondent-app','my-results-app'].forEach(s=>{
     const el=document.getElementById(s);
