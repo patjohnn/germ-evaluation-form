@@ -2662,7 +2662,7 @@ function renderNotifList() {
     return;
   }
   list.innerHTML = notifications.map(n => {
-    return '<div class="notif-item ' + (n.read ? '' : 'unread') + '" onclick="openFromNotif('' + n.qId + '','' + n.id + '')">' +
+    return '<div class="notif-item ' + (n.read ? '' : 'unread') + '" data-qid='+n.qId+' data-nid='+n.id+' onclick="openFromNotif(this.dataset.qid,this.dataset.nid)">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
         '<div class="notif-name">&#128100; ' + esc(n.name) + '</div>' +
         '<div class="notif-meta">' + n.time + '</div>' +
@@ -2696,11 +2696,11 @@ function showNotifPop(notif) {
   if (!pop) return;
   pop.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">' +
     '<div style="font-size:13px;font-weight:600;color:var(--text)">&#127381; Nouvelle réponse !</div>' +
-    '<button onclick="this.parentElement.parentElement.classList.remove('show')" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);margin-left:.5rem">✕</button>' +
+    '<button onclick="this.parentElement.parentElement.classList.remove("show")" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);margin-left:.5rem">✕</button>' +
   '</div>' +
   '<div style="font-size:13px;color:var(--text)"><strong>' + esc(notif.name) + '</strong> a soumis</div>' +
   '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + esc(notif.qTitle) + '</div>' +
-  '<button class="btn btn-xs btn-primary" style="margin-top:.75rem;width:100%;justify-content:center" onclick="openFromNotif('' + notif.qId + '','' + notif.id + '')">Voir la réponse →</button>';
+  '<button class="btn btn-xs btn-primary" style="margin-top:.75rem;width:100%;justify-content:center" data-qid='+n.qId+' data-nid='+n.id+' onclick="openFromNotif(this.dataset.qid,this.dataset.nid)"r la réponse →</button>';
   pop.classList.add('show');
   clearTimeout(pop._t);
   pop._t = setTimeout(() => pop.classList.remove('show'), 6000);
