@@ -714,36 +714,60 @@ async function duplicateQ(id){
 function previewQ(id){
   SB.from('questionnaires').select('*').eq('id',id).single().then(({data:q})=>{
     if(!q){toast('Introuvable.','error');return;}
-    // Ouvrir en mode preview (sans soumission réelle)
-    const prev=document.createElement('div');
-    prev.id='preview-overlay';
-    prev.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;overflow-y:auto';
-    prev.innerHTML='<div style="max-width:740px;margin:2rem auto;padding:0 1rem 4rem">'
-      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
-      +'<span style="background:#amber;color:#854f0b;font-size:12px;font-weight:600;padding:4px 12px;border-radius:99px;background:#faeeda">👁 MODE APERÇU — Soumission désactivée</span>'
-      +'<button onclick="document.getElementById('preview-overlay').remove()" style="background:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:500">✕ Fermer</button>'
-      +'</div>'
-      +'<div id="preview-content"></div></div>';
-    document.body.appendChild(prev);
-    // Sauvegarder curQ et rendre le form
-    const savedQ=curQ; const savedAns=rAns;
+
+    // Creer l'overlay
+    const overlay=document.createElement('div');
+    overlay.id='preview-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;overflow-y:auto;padding:1rem';
+
+    // Barre du haut
+    const topBar=document.createElement('div');
+    topBar.style.cssText='max-width:740px;margin:0 auto 1rem;display:flex;justify-content:space-between;align-items:center';
+    const badge=document.createElement('span');
+    badge.style.cssText='background:#faeeda;color:#854f0b;font-size:12px;font-weight:600;padding:4px 12px;border-radius:99px';
+    badge.textContent='Mode aperçu — soumission désactivée';
+    const closeBtn=document.createElement('button');
+    closeBtn.style.cssText='background:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:500';
+    closeBtn.textContent='✕ Fermer';
+    closeBtn.onclick=()=>overlay.remove();
+    topBar.appendChild(badge);
+    topBar.appendChild(closeBtn);
+
+    // Conteneur du formulaire
+    const formWrap=document.createElement('div');
+    formWrap.style.cssText='max-width:740px;margin:0 auto;padding-bottom:3rem';
+    formWrap.id='r-content';
+
+    overlay.appendChild(topBar);
+    overlay.appendChild(formWrap);
+    document.body.appendChild(overlay);
+
+    // Sauvegarder l'etat actuel
+    const savedQ=curQ, savedAns=JSON.parse(JSON.stringify(rAns));
+    const savedMembers=JSON.parse(JSON.stringify(groupMembers));
+
+    // Remplacer temporairement r-content
+    const realContent=document.getElementById('r-content');
+    if(realContent&&realContent!==formWrap) realContent.id='r-content-backup';
+
     curQ=q; rAns={};
     groupMembers=[{name:'',email:'',genre:'',fonction:'',structure:''}];
-    // Rendre dans le preview
-    const tmpEl=document.getElementById('r-content');
-    document.getElementById('r-content').id='r-content-bak';
-    const previewDiv=document.getElementById('preview-content');
-    previewDiv.id='r-content';
     renderRForm(q);
+
     // Désactiver le bouton submit
     const btn=document.getElementById('submit-btn');
     if(btn){btn.disabled=true;btn.textContent='Aperçu uniquement';}
-    // Restaurer
-    previewDiv.id='preview-content';
-    document.getElementById('r-content-bak').id='r-content';
-    curQ=savedQ; rAns=savedAns;
+
+    // Restaurer après rendu
+    const previewContent=document.getElementById('r-content');
+    if(previewContent) previewContent.id='preview-form-content';
+    const backup=document.getElementById('r-content-backup');
+    if(backup) backup.id='r-content';
+
+    curQ=savedQ; rAns=savedAns; groupMembers=savedMembers;
   });
 }
+
 
 async function toggleActive(id,val){await SB.from('questionnaires').update({active:val}).eq('id',id);renderQuestionnaires();}
 async function deleteQ(id){
