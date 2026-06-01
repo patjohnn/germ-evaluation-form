@@ -1383,19 +1383,27 @@ function _saveMemberValues(){
   });
 }
 
+function _reRenderMembers(){
+  const q=curQ;
+  const isGroup=q.group_mode===true;
+  const requireSig=q.require_signature===true;
+  const refHtml=q.ref_text?'<div class="q-card" style="border-left:4px solid #6c63ff"><div class="sec-title" style="color:#6c63ff">&#128196; Texte de référence</div><div class="ref-box">'+esc(q.ref_text)+'</div></div>':'';
+  const descHtml=q.description?'<div class="q-card" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border-color:#c4b5fd"><div style="font-size:14px;color:#4c1d95;line-height:1.7">'+esc(q.description)+'</div></div>':'';
+  _renderRContent(q,q.questions||[],isGroup,requireSig,refHtml,descHtml);
+  if(requireSig)initSigCanvas();
+}
+
 function addMember(){
   _saveMemberValues();
   groupMembers.push({name:'',email:'',genre:'',fonction:'',structure:''});
-  const q=curQ,qs=q.questions||[],isGroup=q.group_mode===true,requireSig=q.require_signature===true;
-  const refHtml=q.ref_text?'<div class="q-card" style="border-left:4px solid #6c63ff"><div class="sec-title" style="color:#6c63ff">&#128196; Texte de référence</div><div class="ref-box">'+esc(q.ref_text)+'</div></div>':'';
-  const descHtml=q.description?'<div class="q-card" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border-color:#c4b5fd"><div style="font-size:14px;color:#4c1d95;line-height:1.7">'+esc(q.description)+'</div></div>':'';
-  _renderRContent(q,qs,isGroup,requireSig,refHtml,descHtml);
+  _reRenderMembers();
 }
 
 function removeMember(mi){
   _saveMemberValues();
+  if(groupMembers.length<=1){toast('Il faut au moins un membre.','error');return;}
   groupMembers.splice(mi,1);
-  addMember();
+  _reRenderMembers();
 }
 
 let sigDrawing=false,sigCtx=null;
@@ -1861,19 +1869,27 @@ function _saveMemberValues(){
   });
 }
 
+function _reRenderMembers(){
+  const q=curQ;
+  const isGroup=q.group_mode===true;
+  const requireSig=q.require_signature===true;
+  const refHtml=q.ref_text?'<div class="q-card" style="border-left:4px solid #6c63ff"><div class="sec-title" style="color:#6c63ff">&#128196; Texte de référence</div><div class="ref-box">'+esc(q.ref_text)+'</div></div>':'';
+  const descHtml=q.description?'<div class="q-card" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border-color:#c4b5fd"><div style="font-size:14px;color:#4c1d95;line-height:1.7">'+esc(q.description)+'</div></div>':'';
+  _renderRContent(q,q.questions||[],isGroup,requireSig,refHtml,descHtml);
+  if(requireSig)initSigCanvas();
+}
+
 function addMember(){
   _saveMemberValues();
   groupMembers.push({name:'',email:'',genre:'',fonction:'',structure:''});
-  const q=curQ,qs=q.questions||[],isGroup=q.group_mode===true,requireSig=q.require_signature===true;
-  const refHtml=q.ref_text?'<div class="q-card" style="border-left:4px solid #6c63ff"><div class="sec-title" style="color:#6c63ff">&#128196; Texte de référence</div><div class="ref-box">'+esc(q.ref_text)+'</div></div>':'';
-  const descHtml=q.description?'<div class="q-card" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border-color:#c4b5fd"><div style="font-size:14px;color:#4c1d95;line-height:1.7">'+esc(q.description)+'</div></div>':'';
-  _renderRContent(q,qs,isGroup,requireSig,refHtml,descHtml);
+  _reRenderMembers();
 }
 
 function removeMember(mi){
   _saveMemberValues();
+  if(groupMembers.length<=1){toast('Il faut au moins un membre.','error');return;}
   groupMembers.splice(mi,1);
-  addMember();
+  _reRenderMembers();
 }
 
 function initSigCanvas(){
