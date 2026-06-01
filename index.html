@@ -425,6 +425,12 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       <input type="text" id="resp-code" placeholder="Code du questionnaire" style="font-size:13px;text-transform:uppercase">
       <button class="btn btn-sm" onclick="openRespondentByCode()">Ouvrir →</button>
     </div>
+    <hr style="border:none;border-top:.5px solid var(--border);margin:1rem 0">
+    <div style="font-size:12px;color:var(--text3);margin-bottom:.5rem">Consulter mes résultats :</div>
+    <div style="display:flex;gap:8px">
+      <input type="email" id="my-results-email" placeholder="Votre adresse email" style="font-size:13px">
+      <button class="btn btn-sm" style="white-space:nowrap" onclick="openMyResults()">Mes résultats →</button>
+    </div>
   </div>
 </div>
 
@@ -473,6 +479,19 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
 </div>
 
 <!-- MODAL: créer/éditer questionnaire -->
+
+<!-- MES RÉSULTATS -->
+<div id="my-results-app" style="display:none">
+  <div class="r-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button onclick="closeMyResults()" style="background:rgba(255,255,255,.1);border:.5px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:inherit">&#8592; Retour</button>
+      <div style="font-size:14px;font-weight:600;color:#fff" id="mr-header-title">Mes résultats</div>
+    </div>
+    <button onclick="toggleDark()" style="background:rgba(255,255,255,.1);border:.5px solid rgba(255,255,255,.2);color:#fff;border-radius:99px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">&#127769;</button>
+  </div>
+  <div style="max-width:740px;margin:0 auto;padding:1.75rem 1rem 4rem" id="my-results-content"></div>
+</div>
+
 <div class="modal-overlay" id="modal-q">
   <div class="modal modal-xl">
     <div class="mhdr">
@@ -2205,7 +2224,259 @@ async function submitR(){
   document.getElementById('r-content').innerHTML=_parts.join('');
 }
 
-function goHome(){document.getElementById('respondent-app').style.display='none';document.getElementById('login-screen').style.display='flex';}
+// ─── MES RÉSULTATS ────────────────────────────────────
+function showScreen(id){
+  ['login-screen','admin-app','respondent-app','my-results-app'].forEach(s=>{
+    const el=document.getElementById(s);
+    if(el) el.style.display=s===id?(id==='admin-app'?'block':'flex'):'none';
+  });
+  if(id==='my-results-app') document.getElementById('my-results-app').style.display='block';
+}
+
+async function openMyResults(){
+  const email=(document.getElementById('my-results-email')?.value||'').trim().toLowerCase();
+  if(!email||!email.includes('@')){toast('Entrez une adresse email valide.','error');return;}
+
+  const btn=document.querySelector('[onclick="openMyResults()"]');
+  if(btn){btn.disabled=true;btn.textContent='Chargement...';}
+
+  const{data:responses,error}=await SB
+    .from('responses')
+    .select('*')
+    .ilike('respondent_email',email)
+    .order('created_at',{ascending:false});
+
+  if(btn){btn.disabled=false;btn.textContent='Mes résultats →';}
+
+  if(error){toast('Erreur: '+error.message,'error');return;}
+
+  // Récupérer les questionnaires associés
+  const qids=[...new Set((responses||[]).map(r=>r.questionnaire_id))];
+  let questionnaires=[];
+  if(qids.length>0){
+    const{data:qs}=await SB.from('questionnaires').select('id,title,type,questions').in('id',qids);
+    questionnaires=qs||[];
+  }
+
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('my-results-app').style.display='block';
+  document.getElementById('mr-header-title').textContent='Mes résultats — '+email;
+  renderMyResults(responses||[],questionnaires,email);
+}
+
+function closeMyResults(){
+  document.getElementById('my-results-app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
+
+function renderMyResults(responses,questionnaires,email){
+  const container=document.getElementById('my-results-content');
+
+  if(!responses.length){
+    container.innerHTML=[
+      '<div style="text-align:center;padding:4rem 1rem">',
+      '<div style="font-size:48px;margin-bottom:1rem">📭</div>',
+      '<div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Aucun résultat trouvé</div>',
+      '<div style="font-size:14px;color:var(--text2)">Aucune soumission trouvée pour '+esc(email)+'.</div>',
+      '</div>'
+    ].join('');
+    return;
+  }
+
+  // Statistiques globales
+  const graded=responses.filter(r=>r.graded&&r.score_pct!=null);
+  const avgPct=graded.length>0?Math.round(graded.reduce((a,r)=>a+r.score_pct,0)/graded.length):null;
+
+  let html='<div style="margin-bottom:1.5rem">';
+  html+='<div style="font-size:20px;font-weight:700;margin-bottom:.25rem">Mes évaluations</div>';
+  html+='<div style="font-size:13px;color:var(--text2)">'+responses.length+' soumission'+(responses.length>1?'s':'')+' trouvée'+(responses.length>1?'s':'');
+  if(avgPct!==null) html+=' · Moyenne : <strong>'+avgPct+'%</strong>';
+  html+='</div></div>';
+
+  // Cartes par soumission
+  responses.forEach((r,idx)=>{
+    const q=questionnaires.find(x=>x.id===r.questionnaire_id);
+    const totalPts=r.total_points||0;
+    const earned=r.final_score;
+    const pct=r.score_pct;
+    const isGraded=r.graded&&earned!=null;
+    const m=isGraded?getMention(pct):null;
+
+    html+='<div style="background:var(--bg);border:.5px solid var(--border);border-radius:16px;padding:1.25rem 1.5rem;margin-bottom:1rem;box-shadow:0 2px 12px rgba(0,0,0,.06)">';
+
+    // En-tête carte
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem">';
+    html+='<div>';
+    html+='<div style="font-size:15px;font-weight:600;margin-bottom:.2rem">'+esc(q?q.title:'Questionnaire supprimé')+'</div>';
+    html+='<div style="font-size:12px;color:var(--text3)">'+fmt(r.created_at)+'</div>';
+    if(r.group_members&&r.group_members.length>1){
+      html+='<div style="font-size:11px;color:var(--text3);margin-top:2px">Travail de groupe ('+r.group_members.length+' membres)</div>';
+    }
+    html+='</div>';
+
+    // Badge note
+    if(isGraded){
+      html+='<div style="text-align:right">';
+      html+='<div style="font-size:22px;font-weight:800;color:var(--text)">'+earned+'<span style="font-size:14px;opacity:.5"> /'+totalPts+'</span></div>';
+      html+='<div style="font-size:12px;font-weight:600;'+(!m?'':'')+'margin-top:2px;padding:3px 10px;border-radius:99px;display:inline-block;background:'+m.bg+';color:'+m.fg+'">'+pct+'% · '+m.txt+'</div>';
+      html+='</div>';
+    } else {
+      html+='<span style="background:var(--amber-bg);color:var(--amber-text);font-size:11px;font-weight:600;padding:4px 10px;border-radius:99px">En attente de correction</span>';
+    }
+    html+='</div>';
+
+    // Barre de progression
+    if(isGraded){
+      const w=Math.min(pct,100);
+      const barColor=pct>=75?'#4ade80':pct>=50?'#fbbf24':'#f87171';
+      html+='<div style="background:var(--bg3);border-radius:99px;height:6px;margin-bottom:1rem">';
+      html+='<div style="background:'+barColor+';width:'+w+'%;height:6px;border-radius:99px;transition:width 1s"></div></div>';
+    }
+
+    // Bouton détail
+    html+='<div style="display:flex;gap:8px;justify-content:flex-end">';
+    html+='<button class="btn btn-sm" onclick="showResultDetail('+idx+','+JSON.stringify(questionnaires.findIndex(x=>x.id===r.questionnaire_id))+')" data-ridx="'+idx+'">Voir le détail →</button>';
+    if(isGraded){
+      html+='<button class="pdf-btn" style="padding:6px 14px;font-size:12px" onclick="downloadResultPDF(''+r.id+'')">📄 PDF</button>';
+    }
+    html+='</div>';
+    html+='</div>';
+  });
+
+  container.innerHTML=html;
+  container.dataset.responses=JSON.stringify(responses);
+  container.dataset.questionnaires=JSON.stringify(questionnaires);
+}
+
+function showResultDetail(rIdx,qIdx){
+  const container=document.getElementById('my-results-content');
+  const responses=JSON.parse(container.dataset.responses||'[]');
+  const questionnaires=JSON.parse(container.dataset.questionnaires||'[]');
+  const r=responses[rIdx];
+  const q=questionnaires[qIdx];
+  if(!r){return;}
+
+  const isGraded=r.graded&&r.final_score!=null;
+  const m=isGraded?getMention(r.score_pct):null;
+
+  let html='<button class="btn btn-sm" onclick="renderMyResults('+JSON.stringify(responses).replace(/'/g,"&#39;")+','+JSON.stringify(questionnaires).replace(/'/g,"&#39;")+','')" style="margin-bottom:1rem">← Retour à la liste</button>';
+
+  // Score banner
+  if(isGraded){
+    html+='<div class="score-box" style="margin-bottom:1.5rem">';
+    html+='<div style="font-size:13px;opacity:.6;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em">Résultat final</div>';
+    html+='<div class="score-num">'+r.final_score+'<span style="font-size:24px;opacity:.4"> / '+r.total_points+'</span></div>';
+    html+='<div style="font-size:15px;opacity:.6;margin-top:.25rem">'+r.score_pct+'%</div>';
+    const w=Math.min(r.score_pct,100);
+    html+='<div style="background:rgba(255,255,255,.1);border-radius:99px;height:6px;margin:1rem auto;max-width:200px"><div style="background:linear-gradient(90deg,#6c63ff,#8b5cf6);width:'+w+'%;height:6px;border-radius:99px"></div></div>';
+    html+='<span style="font-size:13px;font-weight:700;padding:6px 18px;border-radius:99px;display:inline-block;background:'+m.bg+';color:'+m.fg+'">'+m.txt+'</span>';
+    html+='</div>';
+  }
+
+  // Infos répondant
+  html+='<div class="q-card" style="margin-bottom:1rem">';
+  html+='<div class="sec-title">Informations</div>';
+  const members=r.group_members&&r.group_members.length>0?r.group_members:[{name:r.respondent_name,email:r.respondent_email}];
+  members.forEach((mem,mi)=>{
+    if(members.length>1) html+='<div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px">Membre '+(mi+1)+'</div>';
+    html+='<div style="font-size:13px;margin-bottom:2px"><strong>'+esc(mem.name||'')+'</strong> · '+esc(mem.email||'')+'</div>';
+    if(mem.genre) html+='<div style="font-size:12px;color:var(--text2)">'+esc(mem.genre)+' · '+esc(mem.fonction||'')+' · '+esc(mem.structure||'')+'</div>';
+    if(mi<members.length-1) html+='<hr style="border:none;border-top:.5px solid var(--border);margin:.5rem 0">';
+  });
+  html+='<div style="font-size:11px;color:var(--text3);margin-top:.5rem">Soumis le '+fmt(r.created_at)+'</div>';
+  html+='</div>';
+
+  // Réponses + commentaires
+  if(q){
+    (q.questions||[]).forEach((qq,qi)=>{
+      const ans=(r.answers||{})[qq.id];
+      const ms=r.manual_scores&&r.manual_scores[qq.id];
+      const comment=r.comments&&r.comments[qq.id];
+      const autoSc=autoGrade(q,r.answers||{});
+      const pts=autoSc[qq.id]!==null&&autoSc[qq.id]!==undefined?autoSc[qq.id]:ms;
+      const maxPts=qq.type==='table'?calcTotalPts({questions:[qq]}):(qq.points||1);
+
+      html+='<div class="q-card" style="margin-bottom:.75rem">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">';
+      html+='<div style="font-size:13px;font-weight:600;color:var(--text);flex:1">'+(qi+1)+'. '+esc(qq.label||qq.type)+'</div>';
+      if(isGraded&&pts!==null&&pts!==undefined){
+        const ptColor=+pts>=maxPts?'var(--green-text)':+pts>0?'var(--amber-text)':'var(--red-text)';
+        html+='<div style="font-size:13px;font-weight:700;color:'+ptColor+';margin-left:1rem">'+pts+' / '+maxPts+' pts</div>';
+      }
+      html+='</div>';
+
+      // Réponse
+      let ansHtml='';
+      if(qq.type==='table'&&ans&&ans.rows){
+        const filled=ans.rows.filter(rw=>rw.phrase||(rw.cols||[]).some(c=>c));
+        ansHtml='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+        ansHtml+='<thead><tr><th style="background:var(--bg2);padding:5px 8px;border:.5px solid var(--border2);text-align:left">Phrase</th>';
+        (qq.columns||[]).forEach(c=>{ansHtml+='<th style="background:var(--bg2);padding:5px 8px;border:.5px solid var(--border2)">'+esc(c)+'</th>';});
+        ansHtml+='</tr></thead><tbody>';
+        filled.forEach(rw=>{
+          ansHtml+='<tr><td style="padding:5px 8px;border:.5px solid var(--border2)">'+esc(rw.phrase||'')+'</td>';
+          (qq.columns||[]).forEach((_,ci)=>{ansHtml+='<td style="padding:5px 8px;border:.5px solid var(--border2)">'+esc((rw.cols&&rw.cols[ci])||'')+'</td>';});
+          ansHtml+='</tr>';
+        });
+        ansHtml+='</tbody></table></div>';
+      } else if(qq.type==='checkbox'){
+        ansHtml='<div style="font-size:13px;color:var(--text)">'+esc(Array.isArray(ans)?ans.join(', '):(String(ans||'—')))+'</div>';
+      } else {
+        ansHtml='<div style="font-size:13px;color:var(--text)">'+esc(String(ans||'—'))+'</div>';
+      }
+      html+='<div style="background:var(--bg2);border-radius:8px;padding:.75rem;margin-bottom:'+( comment?'.5rem':'0')+'">'+ansHtml+'</div>';
+
+      // Commentaire de l'admin
+      if(comment){
+        html+='<div style="background:linear-gradient(135deg,var(--blue-bg),var(--purple-bg));border:.5px solid var(--blue-border);border-radius:8px;padding:.75rem;display:flex;gap:8px">';
+        html+='<span style="font-size:16px">💬</span>';
+        html+='<div><div style="font-size:11px;font-weight:600;color:var(--blue-text);margin-bottom:2px">Commentaire du correcteur</div>';
+        html+='<div style="font-size:13px;color:var(--text)">'+esc(comment)+'</div></div>';
+        html+='</div>';
+      }
+      html+='</div>';
+    });
+  }
+
+  // Signature
+  if(r.signature){
+    html+='<div class="q-card">';
+    html+='<div class="sec-title">Signature</div>';
+    html+='<img src="'+r.signature+'" style="max-width:300px;border:.5px solid var(--border);border-radius:8px">';
+    html+='</div>';
+  }
+
+  // Bouton PDF
+  if(isGraded){
+    html+='<div style="text-align:center;margin-top:1.5rem">';
+    html+='<button class="pdf-btn" onclick="downloadResultPDF(''+r.id+'')">📄 Télécharger mon résumé PDF</button>';
+    html+='</div>';
+  }
+
+  container.innerHTML=html;
+}
+
+async function downloadResultPDF(rid){
+  const{data:r}=await SB.from('responses').select('*').eq('id',rid).single();
+  const{data:q}=await SB.from('questionnaires').select('*').eq('id',r.questionnaire_id).single();
+  if(!r||!q){toast('Données introuvables.','error');return;}
+  const members=r.group_members&&r.group_members.length>0?r.group_members:[{name:r.respondent_name,email:r.respondent_email}];
+  const scoreInfo=r.graded&&r.final_score!=null?{earned:r.final_score,totalPts:r.total_points,pct:r.score_pct}:null;
+  generatePDF(q,members,r.answers||{},r.signature,scoreInfo);
+  const b64=generatePDF(q,members,r.answers||{},r.signature,scoreInfo);
+  const link=document.createElement('a');
+  link.href='data:application/pdf;base64,'+b64;
+  link.download='resultat_'+q.title.replace(/\s+/g,'_').slice(0,30)+'.pdf';
+  link.click();
+  toast('PDF téléchargé !');
+}
+
+
+function goHome(){
+  document.getElementById('respondent-app').style.display='none';
+  document.getElementById('my-results-app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+}
 function showRespErr(msg){
   document.getElementById('respondent-app').style.display='block';
   document.getElementById('r-title').textContent='Questionnaire';
