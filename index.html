@@ -2260,6 +2260,8 @@ async function submitR(){
   clearProgress(curQ.id);
   clearInterval(window._autoSave);
   clearInterval(timerInterval);
+  // Nettoyer le timer sauvegardé
+  localStorage.removeItem('evalpro_timer_'+curQ.id);
 
   // Envoyer PDF par email si configuré
   const pdfBase64=generatePDF(curQ,groupMembers,rAns,sigData,pending===0?{earned,totalPts,pct}:null);
@@ -2402,18 +2404,45 @@ function startTimer(q){
   clearInterval(timerInterval);
   const durMs={minutes:60000,heures:3600000,jours:86400000}[q.duration_unit]||60000;
   const totalMs=+q.duration*durMs;
-  const endTime=Date.now()+totalMs;
+  const storageKey='evalpro_timer_'+q.id;
+
+  // Récupérer l'endTime sauvegardé — ou en créer un nouveau
+  let endTime;
+  const saved=localStorage.getItem(storageKey);
+  if(saved){
+    endTime=+saved;
+    // Si le temps est déjà écoulé au rechargement
+    if(endTime<=Date.now()){
+      localStorage.removeItem(storageKey);
+      document.getElementById('r-sub').innerHTML='<span style="color:#ff6b6b;font-weight:600">&#9203; Temps écoulé !</span>';
+      submitR();
+      return;
+    }
+  } else {
+    // Premier démarrage : calculer et sauvegarder l'heure de fin
+    endTime=Date.now()+totalMs;
+    localStorage.setItem(storageKey,endTime);
+  }
+
   const bar=document.getElementById('r-sub');
   function tick(){
     const left=endTime-Date.now();
-    if(left<=0){clearInterval(timerInterval);if(bar)bar.innerHTML='<span style="color:#ff6b6b;font-weight:600">&#9203; Temps écoulé !</span>';submitR();return;}
+    if(left<=0){
+      clearInterval(timerInterval);
+      localStorage.removeItem(storageKey);
+      if(bar)bar.innerHTML='<span style="color:#ff6b6b;font-weight:600">&#9203; Temps écoulé !</span>';
+      submitR();
+      return;
+    }
     const h=Math.floor(left/3600000),mn=Math.floor((left%3600000)/60000),s=Math.floor((left%60000)/1000);
     const str=h>0?h+'h '+mn+'m '+s+'s':mn+'m '+s+'s';
     const pct=Math.round((left/totalMs)*100);
     const col=pct<25?'#ff6b6b':pct<50?'#ffd93d':'#6bcb77';
-    if(bar)bar.innerHTML='<span style="color:'+col+';font-weight:600">&#9203; '+str+(pct<25?' — Dépêchez-vous !':'')+'</span>';
+    const urgent=pct<25?' — Dépêchez-vous !':'';
+    if(bar)bar.innerHTML='<span style="color:'+col+';font-weight:600">&#9203; '+str+urgent+'</span>';
   }
-  tick();timerInterval=setInterval(tick,1000);
+  tick();
+  timerInterval=setInterval(tick,1000);
 }
 function generatePDF(q, members, answers, sigData, scoreInfo){
   try{
