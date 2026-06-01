@@ -428,6 +428,7 @@ create table if not exists responses (
   score_pct integer,
   graded boolean default false,
   group_members jsonb default '[]',
+  group_name text,
   signature text,
   comments jsonb default '{}',
   created_at timestamptz default now()
@@ -979,6 +980,7 @@ function previewQ(id){
 
     curQ=q; rAns={};
     groupMembers=[{name:'',email:'',genre:'',fonction:'',structure:''}];
+  groupName='';
     renderRForm(q);
 
     // Désactiver le bouton submit
@@ -2031,6 +2033,7 @@ window.uTA = uTA;
 
 // Membres du groupe
 let groupMembers=[{name:'',email:'',genre:'',fonction:'',structure:''}];
+let groupName='';
 
 function renderRForm(q){
   const qs=q.questions||[];
@@ -2067,6 +2070,16 @@ function _renderRContent(q,qs,isGroup,requireSig,refHtml,descHtml){
 
 function _buildMembersHtml(isGroup){
   let html='';
+  // Champ nom du groupe (uniquement en mode groupe)
+  if(isGroup){
+    html+='<div class="fgroup" style="margin-bottom:1rem">';
+    html+='<label class="flabel" style="color:rgba(255,255,255,.8);font-weight:700">Nom du groupe *</label>';
+    html+='<input type="text" id="r-group-name" value="'+esc(groupName)+'" placeholder="Ex: Groupe A, Équipe Marketing..." style="font-size:14px;font-weight:500">';
+    html+='</div>';
+    html+='<div style="border-top:.5px solid rgba(255,255,255,.1);padding-top:.75rem;margin-bottom:.75rem">';
+    html+='<div style="font-size:11px;color:rgba(255,255,255,.4);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem">Membres du groupe</div>';
+    html+='</div>';
+  }
   groupMembers.forEach((m,mi)=>{
     html+='<div class="member-row" id="member-'+mi+'">';
     if(isGroup&&mi>0) html+='<button class="remove-member-btn" onclick="removeMember('+mi+')">&#10005;</button>';
@@ -2085,6 +2098,9 @@ function _buildMembersHtml(isGroup){
 }
 
 function _saveMemberValues(){
+  // Sauvegarder le nom du groupe
+  const gnEl=document.getElementById('r-group-name');
+  if(gnEl) groupName=gnEl.value.trim();
   groupMembers.forEach((_,mi)=>{
     groupMembers[mi]={
       name:document.getElementById('r-name-'+mi)?.value||'',
@@ -2194,6 +2210,13 @@ async function submitR(){
     groupMembers[mi].structure = document.getElementById('r-structure-'+mi)?.value||'';
   });
 
+  // Valider le nom du groupe si mode groupe
+  if(curQ.group_mode){
+    const gn=(document.getElementById('r-group-name')?.value||'').trim();
+    if(!gn){toast('Veuillez renseigner le nom du groupe.','error');return;}
+    groupName=gn;
+  }
+
   // Valider tous les membres
   for(let mi=0;mi<groupMembers.length;mi++){
     if(!groupMembers[mi].name){toast('Nom manquant pour le membre '+(mi+1)+'.','error');return;}
@@ -2245,7 +2268,9 @@ async function submitR(){
 
   const{error}=await SB.from('responses').insert({
     id:newId,questionnaire_id:curQ.id,
-    respondent_name:name,respondent_email:email,
+    respondent_name:curQ.group_mode&&groupName?groupName:name,
+    respondent_email:email,
+    group_name:curQ.group_mode?groupName:null,
     group_members:groupMembers,
     answers:JSON.parse(JSON.stringify(rAns)),
     signature:sigData,
@@ -2300,7 +2325,8 @@ async function submitR(){
     parts.push('</div>');
   }
   parts.push('<div style="text-align:center;padding:1rem 1rem 2rem">');
-  parts.push('<div style="font-size:16px;font-weight:600;margin-bottom:.25rem">Merci '+esc(name)+' !</div>');
+  const displayName=curQ.group_mode&&groupName?groupName:name;
+  parts.push('<div style="font-size:16px;font-weight:600;margin-bottom:.25rem">Merci '+esc(displayName)+' !</div>');
   parts.push('<div style="font-size:13px;color:#5f5e5a;margin-bottom:1.5rem">Vos réponses ont bien été enregistrées.</div>');
   parts.push('<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">');
   parts.push('<button class="btn" onclick="goHome()" style="border-radius:10px">&#8592; Retour</button>');
@@ -2321,7 +2347,9 @@ function showScreen(id){
 
 function saveProgress(qid){
   try{
-    const data={rAns:JSON.parse(JSON.stringify(rAns)),members:[]};
+    const gnEl=document.getElementById('r-group-name');
+    if(gnEl) groupName=gnEl.value.trim();
+    const data={rAns:JSON.parse(JSON.stringify(rAns)),groupName:groupName,members:[]};
     groupMembers.forEach((_,mi)=>{
       data.members.push({
         name:document.getElementById('r-name-'+mi)?.value||'',
@@ -2342,6 +2370,12 @@ function restoreProgress(qid){
     if(!data.rAns||Object.keys(data.rAns).length===0)return;
     // Restaurer rAns
     Object.assign(rAns, data.rAns);
+    // Restaurer le nom du groupe
+    if(data.groupName){
+      groupName=data.groupName;
+      const gnEl=document.getElementById('r-group-name');
+      if(gnEl) gnEl.value=data.groupName;
+    }
     // Restaurer les champs membres
     if(data.members){
       data.members.forEach((m,mi)=>{
