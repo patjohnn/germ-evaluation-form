@@ -474,6 +474,14 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     <div class="fgroup"><label class="flabel">Email</label><input type="email" id="login-email" placeholder="admin@exemple.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="fgroup"><label class="flabel">Mot de passe</label><input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Se connecter</button>
+    <div id="hash-helper" style="display:none;margin-top:1rem;background:var(--bg2);border-radius:8px;padding:12px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Hash SHA-256 de votre mot de passe (à coller dans Supabase) :</div>
+      <div id="hash-display" style="font-size:11px;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;border:.5px solid var(--border);cursor:pointer" onclick="copyHash()" title="Cliquer pour copier"></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">Cliquez sur le hash pour copier</div>
+    </div>
+    <div style="text-align:center;margin-top:.75rem">
+      <button onclick="showHashHelper()" style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;font-family:inherit;text-decoration:underline">Problème de connexion ?</button>
+    </div>
     <hr style="border:none;border-top:.5px solid var(--border);margin:1.5rem 0">
     <div style="font-size:12px;color:var(--text3);margin-bottom:.5rem">Accéder à un questionnaire en tant que répondant :</div>
     <div style="display:flex;gap:8px">
@@ -3036,30 +3044,45 @@ async function doLogin(){
   // Essai auth Supabase si email fourni
   if(email && SB){
     try{
+      // Essayer d'abord avec hash SHA-256
       const hash = await hashPwd(pwd);
-      const {data:users,error} = await SB.from('app_users')
-        .select('*').eq('email',email).eq('password_hash',hash).eq('active',true);
+      let {data:users,error} = await SB.from('app_users')
+        .select('*').eq('email',email).eq('active',true);
       if(error) throw error;
-      if(users && users.length > 0){
-        currentUser = users[0];
+
+      // Chercher correspondance : hash OU mot de passe en clair
+      const matched = (users||[]).find(u =>
+        u.password_hash === hash || u.password_hash === pwd
+      );
+
+      if(matched){
+        // Si le mot de passe était en clair, le mettre à jour en hash
+        if(matched.password_hash === pwd){
+          await SB.from('app_users').update({password_hash: hash}).eq('id', matched.id);
+        }
+        currentUser = matched;
         showAdminApp(); return;
       }
+
       toast('Email ou mot de passe incorrect.','error');
       document.getElementById('login-pwd').value='';
       return;
     }catch(e){
-      console.warn('Supabase auth:',e);
-      // Fallback local si Supabase inaccessible
+      console.warn('Supabase auth error:',e);
+      toast('Erreur de connexion Supabase: '+e.message,'error');
+      return;
     }
   }
 
-  // Fallback localStorage (compatibilité ancien système)
-  if(pwd === gc(K_PWD)){
-    currentUser = {name:'Administrateur', email:'admin@local', role:'admin'};
-    showAdminApp();
-  } else {
-    toast('Mot de passe incorrect.','error');
-    document.getElementById('login-pwd').value='';
+  // Fallback sans email : localStorage uniquement
+  if(!email){
+    if(pwd === gc(K_PWD)){
+      currentUser = {name:'Administrateur', email:'admin@local', role:'admin'};
+      showAdminApp();
+    } else {
+      toast('Entrez votre email et mot de passe.','error');
+    }
+    return;
   }
 }
 
@@ -3287,6 +3310,29 @@ function showShareError(msg){
   document.getElementById('respondent-app').style.display='block';
   document.getElementById('r-content').innerHTML =
     '<div style="text-align:center;padding:4rem 1rem"><div style="font-size:48px;margin-bottom:1rem">&#128683;</div><div style="font-size:16px;font-weight:600;margin-bottom:.5rem">'+esc(msg)+'</div><button class="btn" onclick="goHome()">&#8592; Retour</button></div>';
+}
+
+// ─── HELPER HASH MOT DE PASSE ────────────────────────
+async function showHashHelper(){
+  const pwd = (document.getElementById('login-pwd')?.value||'').trim();
+  if(!pwd){toast('Saisissez votre mot de passe ci-dessus.','error');return;}
+  const hash = await hashPwd(pwd);
+  const el = document.getElementById('hash-helper');
+  const disp = document.getElementById('hash-display');
+  if(el) el.style.display='block';
+  if(disp) disp.textContent = hash;
+}
+
+function copyHash(){
+  const txt = document.getElementById('hash-display')?.textContent||'';
+  navigator.clipboard.writeText(txt)
+    .then(()=>toast('Hash copié ! Collez-le dans la colonne password_hash de Supabase.'))
+    .catch(()=>{
+      const ta=document.createElement('textarea');
+      ta.value=txt;document.body.appendChild(ta);ta.select();
+      document.execCommand('copy');ta.remove();
+      toast('Hash copié !');
+    });
 }
 
 // ─── DARK MODE ────────────────────────────────────── ────────────────────────────────────────
