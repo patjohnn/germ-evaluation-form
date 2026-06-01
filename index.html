@@ -122,8 +122,14 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--te
 .close-btn{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);padding:2px 6px;border-radius:4px}
 .close-btn:hover{color:var(--text);background:var(--bg2)}
 /* builder */
-.q-block{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.125rem 1.25rem;margin-bottom:.75rem}
-.q-block:hover{border-color:var(--border2)}
+.q-block{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.125rem 1.25rem;margin-bottom:.75rem;transition:all .2s;position:relative}
+.q-block:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.q-block.dragging{opacity:.4;border:2px dashed var(--border2);background:var(--bg2)}
+.q-block.drag-over{border-color:#6c63ff;border-width:2px;background:linear-gradient(135deg,var(--purple-bg),var(--bg));transform:scale(1.01)}
+.drag-handle{cursor:grab;padding:4px 6px;border-radius:6px;color:var(--text3);font-size:14px;line-height:1;user-select:none;touch-action:none}
+.drag-handle:hover{background:var(--bg2);color:var(--text2)}
+.drag-handle:active{cursor:grabbing}
+.q-block.touch-dragging{box-shadow:0 8px 24px rgba(108,99,255,.3);border-color:#6c63ff;transform:scale(1.02);z-index:100}
 .q-bhdr{display:flex;align-items:center;gap:10px;margin-bottom:.75rem}
 .q-num{width:24px;height:24px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text2);flex-shrink:0}
 .q-bactions{margin-left:auto;display:flex;gap:4px}
@@ -1002,14 +1008,22 @@ function addQ(type){
 
 function renderBuild(){
   document.getElementById('q-builder').innerHTML=bQs.map((q,i)=>`
-    <div class="q-block">
+    <div class="q-block"
+      draggable="true"
+      data-qid="${q.id}"
+      ondragstart="onDragStart(event,'${q.id}')"
+      ondragover="onDragOver(event)"
+      ondragleave="onDragLeave(event)"
+      ondrop="onDrop(event,'${q.id}')"
+      ondragend="onDragEnd(event)">
       <div class="q-bhdr">
+        <span class="drag-handle" title="Glisser pour réorganiser">⠿</span>
         <div class="q-num">${i+1}</div>
         <span class="badge ${BTBC[q.type]||'bg-gray'}">${BTL[q.type]||q.type}</span>
         <div class="q-bactions">
-          ${i>0?`<button class="btn-icon" onclick="mvQ('${q.id}',-1)">↑</button>`:''}
-          ${i<bQs.length-1?`<button class="btn-icon" onclick="mvQ('${q.id}',1)">↓</button>`:''}
-          <button class="btn-icon btn-danger" onclick="rmQ('${q.id}')">✕</button>
+          ${i>0?`<button class="btn-icon" onclick="mvQ('${q.id}',-1)" title="Monter">↑</button>`:''}
+          ${i<bQs.length-1?`<button class="btn-icon" onclick="mvQ('${q.id}',1)" title="Descendre">↓</button>`:''}
+          <button class="btn-icon btn-danger" onclick="rmQ('${q.id}')" title="Supprimer">✕</button>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:.5rem"><input type="text" placeholder="Libellé *" value="${esc(q.label||'')}" oninput="uQ('${q.id}','label',this.value)" style="font-weight:500;flex:1"><label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px;flex-shrink:0">Pts:<input type="number" min="0" max="100" value="${q.points||1}" oninput="uQ('${q.id}','points',+this.value)" style="width:52px;padding:5px 6px;font-size:12px;margin-left:4px"></label></div>
@@ -1020,6 +1034,7 @@ function renderBuild(){
   updateBEmpty();
   document.getElementById('q-count-lbl').textContent=bQs.length?`(${bQs.length})`:'';
   setTimeout(attachBuildEvents,0);
+  setTimeout(initTouchDrag,50);
 }
 
 function buildBody(q){
@@ -1242,6 +1257,137 @@ function attachBuildEvents(){
     });
   });
 }
+// ─── DRAG & DROP BUILDER ─────────────────────────────
+let dragSrcId = null;
+
+function onDragStart(e, qid) {
+  dragSrcId = qid;
+  const el = e.currentTarget;
+  el.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', qid);
+  // Créer une image de drag personnalisée
+  const ghost = el.cloneNode(true);
+  ghost.style.cssText = 'position:absolute;top:-9999px;opacity:.8;width:' + el.offsetWidth + 'px';
+  document.body.appendChild(ghost);
+  e.dataTransfer.setDragImage(ghost, 20, 20);
+  setTimeout(() => ghost.remove(), 0);
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const el = e.currentTarget;
+  const targetId = el.dataset.qid;
+  if (targetId && targetId !== dragSrcId) {
+    // Retirer drag-over de tous les autres
+    document.querySelectorAll('.q-block.drag-over').forEach(b => {
+      if (b !== el) b.classList.remove('drag-over');
+    });
+    el.classList.add('drag-over');
+  }
+}
+
+function onDragLeave(e) {
+  // Vérifier qu'on quitte vraiment le bloc (pas juste un enfant)
+  const el = e.currentTarget;
+  if (!el.contains(e.relatedTarget)) {
+    el.classList.remove('drag-over');
+  }
+}
+
+function onDrop(e, targetId) {
+  e.preventDefault();
+  e.stopPropagation();
+  const el = e.currentTarget;
+  el.classList.remove('drag-over');
+  if (!dragSrcId || dragSrcId === targetId) return;
+  // Réorganiser le tableau bQs
+  const srcIdx = bQs.findIndex(x => x.id === dragSrcId);
+  const tgtIdx = bQs.findIndex(x => x.id === targetId);
+  if (srcIdx === -1 || tgtIdx === -1) return;
+  const moved = bQs.splice(srcIdx, 1)[0];
+  bQs.splice(tgtIdx, 0, moved);
+  renderBuild();
+}
+
+function onDragEnd(e) {
+  dragSrcId = null;
+  document.querySelectorAll('.q-block').forEach(b => {
+    b.classList.remove('dragging', 'drag-over');
+  });
+}
+
+// ─── DRAG & DROP TOUCH (mobile) ──────────────────────
+let touchDragId = null;
+let touchClone = null;
+let touchStartY = 0;
+
+function initTouchDrag() {
+  // Délégation d'événements sur le container
+  const container = document.getElementById('q-builder');
+  if (!container) return;
+
+  container.addEventListener('touchstart', e => {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    const block = handle.closest('.q-block');
+    if (!block) return;
+    touchDragId = block.dataset.qid;
+    touchStartY = e.touches[0].clientY;
+    block.classList.add('touch-dragging');
+
+    // Créer un clone visuel
+    touchClone = block.cloneNode(true);
+    touchClone.style.cssText = 'position:fixed;width:' + block.offsetWidth + 'px;opacity:.85;pointer-events:none;z-index:9999;left:' + block.getBoundingClientRect().left + 'px;top:' + block.getBoundingClientRect().top + 'px;box-shadow:0 12px 32px rgba(0,0,0,.2);border-radius:12px;transform:scale(1.02)';
+    document.body.appendChild(touchClone);
+  }, {passive: true});
+
+  container.addEventListener('touchmove', e => {
+    if (!touchDragId || !touchClone) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const dy = touch.clientY - touchStartY;
+    touchClone.style.top = (parseFloat(touchClone.style.top) + dy) + 'px';
+    touchStartY = touch.clientY;
+
+    // Trouver le bloc cible
+    touchClone.style.display = 'none';
+    const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    touchClone.style.display = '';
+    const targetBlock = elBelow && elBelow.closest('.q-block');
+
+    document.querySelectorAll('.q-block.drag-over').forEach(b => b.classList.remove('drag-over'));
+    if (targetBlock && targetBlock.dataset.qid !== touchDragId) {
+      targetBlock.classList.add('drag-over');
+    }
+  }, {passive: false});
+
+  container.addEventListener('touchend', e => {
+    if (!touchDragId) return;
+    // Trouver la cible finale
+    const touch = e.changedTouches[0];
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+    document.querySelectorAll('.q-block').forEach(b => b.classList.remove('touch-dragging','drag-over'));
+
+    const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetBlock = elBelow && elBelow.closest('.q-block');
+    const targetId = targetBlock && targetBlock.dataset.qid;
+
+    if (targetId && targetId !== touchDragId) {
+      const srcIdx = bQs.findIndex(x => x.id === touchDragId);
+      const tgtIdx = bQs.findIndex(x => x.id === targetId);
+      if (srcIdx !== -1 && tgtIdx !== -1) {
+        const moved = bQs.splice(srcIdx, 1)[0];
+        bQs.splice(tgtIdx, 0, moved);
+        renderBuild();
+        initTouchDrag(); // Réattacher après re-render
+      }
+    }
+    touchDragId = null;
+  }, {passive: true});
+}
+
 const updateBEmpty=()=>{const e=document.getElementById('builder-empty');if(e)e.style.display=bQs.length===0?'block':'none';};
 const uQ=(qid,k,v)=>{const q=bQs.find(x=>x.id===qid);if(q)q[k]=v;};
 const uOpt=(qid,oi,v)=>{const q=bQs.find(x=>x.id===qid);if(q)q.options[oi]=v;};
