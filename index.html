@@ -474,6 +474,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     <div class="fgroup"><label class="flabel">Email</label><input type="email" id="login-email" placeholder="admin@exemple.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="fgroup"><label class="flabel">Mot de passe</label><input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Se connecter</button>
+    <div id="login-debug" style="display:none;margin-top:1rem;background:#f8f8f8;border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;font-family:monospace"></div>
     <div id="hash-helper" style="display:none;margin-top:1rem;background:var(--bg2);border-radius:8px;padding:12px">
       <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Hash SHA-256 de votre mot de passe (à coller dans Supabase) :</div>
       <div id="hash-display" style="font-size:11px;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;border:.5px solid var(--border);cursor:pointer" onclick="copyHash()" title="Cliquer pour copier"></div>
@@ -3039,50 +3040,72 @@ async function hashPwd(pwd){
 async function doLogin(){
   const pwd = (document.getElementById('login-pwd')?.value||'').trim();
   const email = (document.getElementById('login-email')?.value||'').trim().toLowerCase();
-  if(!pwd){toast('Mot de passe requis.','error');return;}
 
-  // Essai auth Supabase si email fourni
-  if(email && SB){
-    try{
-      // Essayer d'abord avec hash SHA-256
-      const hash = await hashPwd(pwd);
-      let {data:users,error} = await SB.from('app_users')
-        .select('*').eq('email',email).eq('active',true);
-      if(error) throw error;
-
-      // Chercher correspondance : hash OU mot de passe en clair
-      const matched = (users||[]).find(u =>
-        u.password_hash === hash || u.password_hash === pwd
-      );
-
-      if(matched){
-        // Si le mot de passe était en clair, le mettre à jour en hash
-        if(matched.password_hash === pwd){
-          await SB.from('app_users').update({password_hash: hash}).eq('id', matched.id);
-        }
-        currentUser = matched;
-        showAdminApp(); return;
-      }
-
-      toast('Email ou mot de passe incorrect.','error');
-      document.getElementById('login-pwd').value='';
-      return;
-    }catch(e){
-      console.warn('Supabase auth error:',e);
-      toast('Erreur de connexion Supabase: '+e.message,'error');
-      return;
-    }
+  // Afficher debug en temps réel
+  const debugEl = document.getElementById('login-debug');
+  function dbg(msg, ok){
+    if(!debugEl) return;
+    debugEl.style.display='block';
+    debugEl.innerHTML += '<div style="color:'+(ok?'green':'#c0392b')+';font-size:11px;margin:2px 0">'+msg+'</div>';
   }
+  if(debugEl) debugEl.innerHTML='';
 
-  // Fallback sans email : localStorage uniquement
-  if(!email){
-    if(pwd === gc(K_PWD)){
-      currentUser = {name:'Administrateur', email:'admin@local', role:'admin'};
-      showAdminApp();
-    } else {
-      toast('Entrez votre email et mot de passe.','error');
+  if(!email){dbg('Email manquant',false);toast('Entrez votre email.','error');return;}
+  if(!pwd){dbg('Mot de passe manquant',false);toast('Mot de passe requis.','error');return;}
+
+  dbg('Email: '+email, true);
+  dbg('Longueur mot de passe: '+pwd.length, true);
+
+  if(!SB){dbg('SB non initialisé — vérifiez la config Supabase',false);return;}
+  dbg('Supabase connecté', true);
+
+  try{
+    const hash = await hashPwd(pwd);
+    dbg('Hash généré: '+hash.slice(0,16)+'...', true);
+
+    const {data:users, error} = await SB.from('app_users')
+      .select('id,name,email,password_hash,role,active')
+      .eq('email', email);
+
+    if(error){dbg('Erreur Supabase: '+error.message,false);toast('Erreur Supabase: '+error.message,'error');return;}
+
+    dbg('Utilisateurs trouvés avec cet email: '+(users?users.length:0), users&&users.length>0);
+
+    if(!users||users.length===0){
+      dbg('Aucun compte avec cet email. Verifiez email ou creez un compte.',false);
+      toast('Aucun compte trouvé avec cet email.','error');
+      return;
     }
-    return;
+
+    const u = users[0];
+    dbg('Compte trouvé: '+u.name+' (actif: '+u.active+')', u.active);
+    dbg('Hash en base: '+u.password_hash.slice(0,16)+'...', true);
+    dbg('Hash saisi:   '+hash.slice(0,16)+'...', true);
+    dbg('Correspondance hash: '+(u.password_hash===hash), u.password_hash===hash);
+    dbg('Correspondance clair: '+(u.password_hash===pwd), u.password_hash===pwd);
+
+    if(!u.active){
+      dbg('Compte désactivé.',false);
+      toast('Ce compte est désactivé.','error');return;
+    }
+
+    if(u.password_hash===hash || u.password_hash===pwd){
+      // Mettre à jour en hash si c'était en clair
+      if(u.password_hash===pwd){
+        dbg('Mise à jour du mot de passe en hash...', true);
+        await SB.from('app_users').update({password_hash:hash}).eq('id',u.id);
+      }
+      currentUser = u;
+      dbg('CONNEXION RÉUSSIE !', true);
+      setTimeout(showAdminApp, 500);
+    } else {
+      dbg('Mot de passe incorrect.',false);
+      toast('Mot de passe incorrect.','error');
+      document.getElementById('login-pwd').value='';
+    }
+  }catch(e){
+    dbg('Exception: '+e.message,false);
+    toast('Erreur: '+e.message,'error');
   }
 }
 
