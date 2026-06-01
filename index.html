@@ -2349,6 +2349,7 @@ function closeMyResults(){
 function renderMyResults(responses,questionnaires,email){
   const container=document.getElementById('my-results-content');
 
+  container.dataset.email=email||'';
   if(!responses.length){
     container.innerHTML=[
       '<div style="text-align:center;padding:4rem 1rem">',
@@ -2425,6 +2426,14 @@ function renderMyResults(responses,questionnaires,email){
   container.dataset.questionnaires=JSON.stringify(questionnaires);
 }
 
+function backToMyResults(){
+  const container=document.getElementById('my-results-content');
+  const responses=JSON.parse(container.dataset.responses||'[]');
+  const questionnaires=JSON.parse(container.dataset.questionnaires||'[]');
+  const email=container.dataset.email||'';
+  renderMyResults(responses,questionnaires,email);
+}
+
 function showResultDetail(rIdx,qIdx){
   const container=document.getElementById('my-results-content');
   const responses=JSON.parse(container.dataset.responses||'[]');
@@ -2436,7 +2445,7 @@ function showResultDetail(rIdx,qIdx){
   const isGraded=r.graded&&r.final_score!=null;
   const m=isGraded?getMention(r.score_pct):null;
 
-  let html='<button class="btn btn-sm" onclick="renderMyResults('+JSON.stringify(responses).replace(/'/g,"&#39;")+','+JSON.stringify(questionnaires).replace(/'/g,"&#39;")+','')" style="margin-bottom:1rem">← Retour à la liste</button>';
+  let html='<button class="btn btn-sm" onclick="backToMyResults()" style="margin-bottom:1rem">&#8592; Retour à la liste</button>';
 
   // Score banner
   if(isGraded){
