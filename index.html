@@ -362,6 +362,17 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
 .tpl-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:.75rem}
 .tpl-meta{display:flex;gap:8px;flex-wrap:wrap}
 .tpl-tag{font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--bg3);color:var(--text2)}
+
+/* ── USERS & SHARE ── */
+.user-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:.5px solid var(--border)}
+.user-row:last-child{border-bottom:none}
+.user-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6c63ff,#8b5cf6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.role-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px}
+.role-admin{background:var(--purple-bg);color:var(--purple-text)}
+.role-corrector{background:var(--blue-bg);color:var(--blue-text)}
+.role-viewer{background:var(--green-bg);color:var(--green-text)}
+.share-link-box{background:var(--bg2);border:.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;word-break:break-all;color:var(--text2);margin:.75rem 0}
+.field-hint{font-size:12px;color:var(--text2);line-height:1.6;background:var(--bg2);border-radius:8px;padding:8px 12px}
 </style>
 </head>
 <body>
@@ -460,8 +471,9 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       <div class="login-icon">E</div>
       <div><div style="font-size:18px;font-weight:700">EvalPro</div><div style="font-size:12px;color:var(--text3)">Plateforme d'évaluation</div></div>
     </div>
-    <div class="fgroup"><label class="flabel">Mot de passe administrateur</label><input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Accéder au tableau de bord</button>
+    <div class="fgroup"><label class="flabel">Email</label><input type="email" id="login-email" placeholder="admin@exemple.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="fgroup"><label class="flabel">Mot de passe</label><input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Se connecter</button>
     <hr style="border:none;border-top:.5px solid var(--border);margin:1.5rem 0">
     <div style="font-size:12px;color:var(--text3);margin-bottom:.5rem">Accéder à un questionnaire en tant que répondant :</div>
     <div style="display:flex;gap:8px">
@@ -741,6 +753,8 @@ async function init(){
     const {error}=await SB.from('questionnaires').select('id').limit(1);
     if(error) throw error;
     hideLov();
+    const shareToken=new URLSearchParams(window.location.search).get('share');
+    if(shareToken){ await loadSharedResult(shareToken); return; }
     if(code){ await loadRespondentByCode(code); return; }
     document.getElementById('login-screen').style.display='flex';
   }catch(e){
@@ -778,15 +792,7 @@ async function finishSetup(){
 }
 
 // ─── AUTH ─────────────────────────────────────────────
-function doLogin(){
-  if(document.getElementById('login-pwd').value===gc(K_PWD)){
-    document.getElementById('login-screen').style.display='none';
-    document.getElementById('admin-app').style.display='block';
-    navigate('dashboard');
-    loadSavedNotifs();
-    initRealtime();
-  }else{toast('Mot de passe incorrect.','error');document.getElementById('login-pwd').value='';}
-}
+// doLogin remplacé ci-dessus
 function doLogout(){
   if(realtimeChannel) { SB.removeChannel(realtimeChannel); realtimeChannel=null; }
   notifications=[]; unreadCount=0;
@@ -807,6 +813,7 @@ function navigate(view){
   ({dashboard:renderDashboard,questionnaires:renderQuestionnaires,responses:renderResponses,settings:renderSettings})[view]?.();
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   updateDarkBtn(isDark);
+  if(view==='settings') setTimeout(loadUsers,300);
 }
 async function updateBadges(){
   const[{data:qs},{data:rs}]=await Promise.all([
@@ -1636,6 +1643,7 @@ async function viewResponses(qid){
         '</div>'+
         '<div style="display:flex;gap:6px;flex-direction:column;align-items:flex-end">'+
           '<button class="btn btn-xs btn-success" data-rid="'+r.id+'" data-qid="'+qid+'" onclick="saveGrade(this.dataset.rid,this.dataset.qid)">&#128190; Enregistrer</button>'+
+          '<button class="btn btn-xs" data-rid="'+r.id+'" onclick="openShareModal(this.dataset.rid)" style="margin-top:4px">&#128279; Partager</button>'+
           '<button class="btn btn-xs btn-danger" data-rid="'+r.id+'" data-qid="'+qid+'" onclick="delResp(this.dataset.rid);viewResponses(this.dataset.qid)">&#128465;</button>'+
         '</div>'+
       '</div>'+
@@ -1750,9 +1758,16 @@ function renderSettings(){
     </div>
     <div class="card"><div class="sec-title">Sécurité</div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
-        <div><div style="font-size:14px;font-weight:500">Mot de passe administrateur</div></div>
-        <button class="btn btn-sm" onclick="openModal('modal-pwd')">🔑 Changer</button>
+        <div><div style="font-size:14px;font-weight:500">Mot de passe local</div><div style="font-size:12px;color:var(--text2)">Stocké sur cet appareil uniquement.</div></div>
+        <button class="btn btn-sm" onclick="openModal('modal-pwd')">&#128273; Changer</button>
       </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+        <div class="sec-title" style="margin-bottom:0">Comptes utilisateurs</div>
+        <button class="btn btn-primary btn-sm" onclick="openNewUserModal()">+ Nouveau compte</button>
+      </div>
+      <div id="users-list"></div>
     </div>
     <div class="card"><div class="sec-title">Export</div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
@@ -3005,7 +3020,276 @@ function applyTemplate(templateId) {
   }, 100);
 }
 
-// ─── DARK MODE ────────────────────────────────────────
+// ─── AUTH SUPABASE ───────────────────────────────────
+let currentUser = null;
+
+async function hashPwd(pwd){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function doLogin(){
+  const pwd = (document.getElementById('login-pwd')?.value||'').trim();
+  const email = (document.getElementById('login-email')?.value||'').trim().toLowerCase();
+  if(!pwd){toast('Mot de passe requis.','error');return;}
+
+  // Essai auth Supabase si email fourni
+  if(email && SB){
+    try{
+      const hash = await hashPwd(pwd);
+      const {data:users,error} = await SB.from('app_users')
+        .select('*').eq('email',email).eq('password_hash',hash).eq('active',true);
+      if(error) throw error;
+      if(users && users.length > 0){
+        currentUser = users[0];
+        showAdminApp(); return;
+      }
+      toast('Email ou mot de passe incorrect.','error');
+      document.getElementById('login-pwd').value='';
+      return;
+    }catch(e){
+      console.warn('Supabase auth:',e);
+      // Fallback local si Supabase inaccessible
+    }
+  }
+
+  // Fallback localStorage (compatibilité ancien système)
+  if(pwd === gc(K_PWD)){
+    currentUser = {name:'Administrateur', email:'admin@local', role:'admin'};
+    showAdminApp();
+  } else {
+    toast('Mot de passe incorrect.','error');
+    document.getElementById('login-pwd').value='';
+  }
+}
+
+function showAdminApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('admin-app').style.display='block';
+  navigate('dashboard');
+  loadSavedNotifs();
+  initRealtime();
+  // Afficher le nom de l'utilisateur connecté
+  const nameEl = document.querySelector('.sb-uname');
+  if(nameEl && currentUser) nameEl.textContent = currentUser.name || 'Administrateur';
+}
+
+// ─── GESTION UTILISATEURS ────────────────────────────
+function openNewUserModal(){
+  ['nu-name','nu-email','nu-pwd'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('nu-role').value='admin';
+  loadUsers();
+  openModal('modal-new-user');
+}
+
+async function saveUser(){
+  const name = (document.getElementById('nu-name')?.value||'').trim();
+  const email = (document.getElementById('nu-email')?.value||'').trim().toLowerCase();
+  const pwd = (document.getElementById('nu-pwd')?.value||'').trim();
+  const role = document.getElementById('nu-role')?.value||'admin';
+
+  if(!name){toast('Nom requis.','error');return;}
+  if(!email||!email.includes('@')){toast('Email invalide.','error');return;}
+  if(!pwd||pwd.length<6){toast('Mot de passe trop court (min. 6 caractères).','error');return;}
+
+  const btn = document.querySelector('#modal-new-user .btn-primary');
+  if(btn){btn.disabled=true; btn.textContent='Création...';}
+
+  try{
+    const hash = await hashPwd(pwd);
+    const {error} = await SB.from('app_users').insert({
+      id: crypto.randomUUID(), name, email,
+      password_hash: hash, role, active: true
+    });
+    if(error) throw error;
+    toast('Compte créé avec succès !');
+    closeModal('modal-new-user');
+    loadUsers();
+  }catch(e){
+    toast('Erreur: '+e.message,'error');
+  }finally{
+    if(btn){btn.disabled=false; btn.textContent='Créer le compte';}
+  }
+}
+
+async function loadUsers(){
+  const el = document.getElementById('users-list');
+  if(!el) return;
+  el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:.5rem 0">Chargement...</div>';
+  try{
+    const {data:users,error} = await SB.from('app_users').select('*').order('created_at');
+    if(error) throw error;
+    if(!users||!users.length){
+      el.innerHTML='<div style="color:var(--text3);font-size:13px;padding:.5rem 0">Aucun compte. Créez le premier compte administrateur.</div>';
+      return;
+    }
+    const roleLbl = {admin:'Administrateur',corrector:'Correcteur',viewer:'Lecteur'};
+    const roleCls = {admin:'role-admin',corrector:'role-corrector',viewer:'role-viewer'};
+    el.innerHTML = users.map(u=>`
+      <div class="user-row">
+        <div class="user-avatar">${esc(u.name||'?').charAt(0).toUpperCase()}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${esc(u.name)}</div>
+          <div style="font-size:11px;color:var(--text2)">${esc(u.email)}</div>
+        </div>
+        <span class="role-badge ${roleCls[u.role]||'role-viewer'}">${roleLbl[u.role]||u.role}</span>
+        <button class="btn btn-xs btn-danger" data-uid="${u.id}" onclick="deleteUser(this.dataset.uid)">&#10005;</button>
+      </div>`).join('');
+  }catch(e){
+    el.innerHTML='<div style="color:var(--red-text);font-size:12px">Erreur: '+esc(e.message)+'</div>';
+  }
+}
+
+async function deleteUser(uid){
+  if(!confirm('Supprimer ce compte ?')) return;
+  const {error} = await SB.from('app_users').delete().eq('id',uid);
+  if(error){toast('Erreur: '+error.message,'error');return;}
+  toast('Compte supprimé.');
+  loadUsers();
+}
+
+// ─── LIENS DE PARTAGE ────────────────────────────────
+let _shareRid = null;
+
+function openShareModal(rid){
+  _shareRid = rid;
+  document.getElementById('share-duration').value = '7';
+  document.getElementById('share-duration-unit').value = 'days';
+  document.getElementById('share-link-result').style.display = 'none';
+  document.getElementById('generate-share-btn').disabled = false;
+  openModal('modal-share');
+}
+
+async function generateShareLink(){
+  if(!_shareRid) return;
+  const dur = +document.getElementById('share-duration').value || 7;
+  const unit = document.getElementById('share-duration-unit').value;
+  const msMap = {hours:3600000, days:86400000, months:2592000000};
+  const expiresAt = new Date(Date.now() + dur * (msMap[unit]||86400000)).toISOString();
+
+  const btn = document.getElementById('generate-share-btn');
+  btn.disabled = true; btn.textContent = 'Génération...';
+
+  try{
+    const token = uid() + uid(); // token unique 32 chars
+    const {error} = await SB.from('share_links').insert({
+      id: uid(), response_id: _shareRid, token,
+      expires_at: expiresAt,
+      created_by: currentUser?.email||'admin'
+    });
+    if(error) throw error;
+
+    const baseUrl = window.location.origin + window.location.pathname;
+    const link = baseUrl + '?share=' + token;
+    document.getElementById('share-link-text').textContent = link;
+    const unitLbl = {hours:'heure(s)',days:'jour(s)',months:'mois'};
+    document.getElementById('share-link-expiry').textContent =
+      'Expire dans ' + dur + ' ' + (unitLbl[unit]||unit) + ' — ' + new Date(expiresAt).toLocaleDateString('fr-FR');
+    document.getElementById('share-link-result').style.display = 'block';
+    toast('Lien généré !');
+  }catch(e){
+    toast('Erreur: '+e.message,'error');
+  }finally{
+    btn.disabled = false; btn.textContent = '&#128279; Générer le lien';
+  }
+}
+
+function copyShareLink(){
+  const txt = document.getElementById('share-link-text')?.textContent||'';
+  navigator.clipboard.writeText(txt).then(()=>toast('Lien copié !')).catch(()=>{
+    const ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); toast('Lien copié !');
+  });
+}
+
+// ─── LECTURE LIEN PARTAGE (vue publique) ─────────────
+async function loadSharedResult(token){
+  try{
+    const {data:links} = await SB.from('share_links').select('*').eq('token',token).single();
+    if(!links){showShareError('Lien invalide ou expiré.');return;}
+    if(links.expires_at && new Date(links.expires_at) < new Date()){
+      showShareError('Ce lien a expiré.');return;
+    }
+    const {data:r} = await SB.from('responses').select('*').eq('id',links.response_id).single();
+    const {data:q} = await SB.from('questionnaires').select('*').eq('id',r.questionnaire_id).single();
+    if(!r||!q){showShareError('Données introuvables.');return;}
+
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('respondent-app').style.display='block';
+
+    const isGraded = r.graded && r.final_score != null;
+    const m = isGraded ? getMention(r.score_pct) : null;
+    const members = (r.group_members&&r.group_members.length) ? r.group_members : [{name:r.respondent_name,email:r.respondent_email}];
+
+    let html = '<div style="max-width:700px;margin:0 auto;padding:1.5rem 1rem 4rem">';
+    // Badge lecture seule
+    html += '<div style="background:var(--amber-bg);color:var(--amber-text);font-size:12px;font-weight:600;padding:6px 14px;border-radius:99px;display:inline-block;margin-bottom:1rem">&#128274; Vue lecture seule</div>';
+    html += '<div style="font-size:22px;font-weight:800;margin-bottom:.25rem">'+esc(q.title)+'</div>';
+
+    if(isGraded){
+      html += '<div class="score-box" style="margin:1rem 0">';
+      html += '<div style="font-size:13px;opacity:.6;margin-bottom:.5rem;text-transform:uppercase">Résultat</div>';
+      html += '<div class="score-num">'+r.final_score+'<span style="font-size:24px;opacity:.4"> / '+r.total_points+'</span></div>';
+      html += '<div style="font-size:15px;opacity:.6;margin-top:.25rem">'+r.score_pct+'%</div>';
+      const w=Math.min(r.score_pct,100);
+      html += '<div style="background:rgba(255,255,255,.1);border-radius:99px;height:6px;margin:1rem auto;max-width:200px"><div style="background:linear-gradient(90deg,#6c63ff,#8b5cf6);width:'+w+'%;height:6px;border-radius:99px"></div></div>';
+      html += '<span style="font-size:13px;font-weight:700;padding:6px 18px;border-radius:99px;display:inline-block;background:'+m.bg+';color:'+m.fg+'">'+m.txt+'</span>';
+      html += '</div>';
+    }
+
+    // Infos répondant
+    html += '<div class="q-card" style="margin-bottom:1rem"><div class="sec-title">Répondant</div>';
+    members.forEach(mem=>{
+      html += '<div style="font-size:13px"><strong>'+esc(mem.name||'')+'</strong>';
+      if(mem.email) html += ' · '+esc(mem.email);
+      if(mem.genre) html += ' · '+esc(mem.genre);
+      if(mem.fonction) html += ' · '+esc(mem.fonction);
+      html += '</div>';
+    });
+    html += '<div style="font-size:11px;color:var(--text3);margin-top:.25rem">Soumis le '+fmt(r.created_at)+'</div></div>';
+
+    // Réponses
+    (q.questions||[]).forEach((qq,qi)=>{
+      const ans=(r.answers||{})[qq.id];
+      const comment=r.comments&&r.comments[qq.id];
+      let ansHtml='';
+      if(qq.type==='table'&&ans&&ans.rows){
+        ansHtml='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:var(--bg2);padding:5px 8px;border:.5px solid var(--border)">Phrase</th>';
+        (qq.columns||[]).forEach(c=>{ansHtml+='<th style="background:var(--bg2);padding:5px 8px;border:.5px solid var(--border)">'+esc(c)+'</th>';});
+        ansHtml+='</tr></thead><tbody>';
+        ans.rows.forEach(rw=>{
+          ansHtml+='<tr><td style="padding:5px 8px;border:.5px solid var(--border)">'+esc(rw.phrase||'')+'</td>';
+          (qq.columns||[]).forEach((_,ci)=>{ansHtml+='<td style="padding:5px 8px;border:.5px solid var(--border)">'+esc((rw.cols&&rw.cols[ci])||'')+'</td>';});
+          ansHtml+='</tr>';
+        });
+        ansHtml+='</tbody></table></div>';
+      } else {
+        ansHtml='<div style="font-size:13px">'+esc(Array.isArray(ans)?ans.join(', '):(ans!==null&&ans!==undefined?String(ans):'—'))+'</div>';
+      }
+      html += '<div class="q-card" style="margin-bottom:.75rem">';
+      html += '<div style="font-size:13px;font-weight:600;margin-bottom:.5rem">'+(qi+1)+'. '+esc(qq.label||qq.type)+'</div>';
+      html += '<div style="background:var(--bg2);border-radius:8px;padding:.75rem">'+ansHtml+'</div>';
+      if(comment) html += '<div style="background:var(--blue-bg);border:.5px solid var(--blue-border);border-radius:8px;padding:.75rem;margin-top:.5rem;font-size:12px;color:var(--blue-text)">&#128172; '+esc(comment)+'</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    document.getElementById('r-content').innerHTML = html;
+  }catch(e){
+    showShareError('Erreur lors du chargement: '+e.message);
+  }
+}
+
+function showShareError(msg){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('respondent-app').style.display='block';
+  document.getElementById('r-content').innerHTML =
+    '<div style="text-align:center;padding:4rem 1rem"><div style="font-size:48px;margin-bottom:1rem">&#128683;</div><div style="font-size:16px;font-weight:600;margin-bottom:.5rem">'+esc(msg)+'</div><button class="btn" onclick="goHome()">&#8592; Retour</button></div>';
+}
+
+// ─── DARK MODE ────────────────────────────────────── ────────────────────────────────────────
 function initDarkMode(){
   const saved=localStorage.getItem('evalpro_theme');
   if(saved==='dark'){
@@ -3047,5 +3331,70 @@ window.addEventListener('beforeunload', () => {
 
 init();
 </script>
+
+<!-- MODAL: Nouveau compte utilisateur -->
+<div class="modal-overlay" id="modal-new-user">
+  <div class="modal">
+    <div class="mhdr">
+      <div><div class="mtitle">Nouveau compte utilisateur</div><div class="msub">Le compte sera utilisable sur tous les appareils</div></div>
+      <button class="close-btn" onclick="closeModal('modal-new-user')">&#10005;</button>
+    </div>
+    <div class="frow2">
+      <div class="fgroup"><label class="flabel">Nom complet *</label><input type="text" id="nu-name" placeholder="Jean Konan"></div>
+      <div class="fgroup"><label class="flabel">Email *</label><input type="email" id="nu-email" placeholder="jean@exemple.com"></div>
+    </div>
+    <div class="frow2">
+      <div class="fgroup"><label class="flabel">Mot de passe *</label><input type="password" id="nu-pwd" placeholder="Min. 6 caractères"></div>
+      <div class="fgroup"><label class="flabel">Rôle</label>
+        <select id="nu-role">
+          <option value="admin">Administrateur (accès complet)</option>
+          <option value="corrector">Correcteur (corriger les réponses)</option>
+          <option value="viewer">Lecteur (voir les résultats)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-hint">
+      <strong>Administrateur</strong> — créer/modifier questionnaires, voir et corriger toutes les réponses.<br>
+      <strong>Correcteur</strong> — corriger les réponses et voir les résultats, sans modifier les questionnaires.<br>
+      <strong>Lecteur</strong> — consulter les résultats uniquement, aucune modification possible.
+    </div>
+    <div class="mactions">
+      <button class="btn" onclick="closeModal('modal-new-user')">Annuler</button>
+      <button class="btn btn-primary" onclick="saveUser()">Créer le compte</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Partage résultats -->
+<div class="modal-overlay" id="modal-share">
+  <div class="modal" style="max-width:480px">
+    <div class="mhdr">
+      <div><div class="mtitle">Partager les résultats</div><div class="msub">Générer un lien de lecture seule</div></div>
+      <button class="close-btn" onclick="closeModal('modal-share')">&#10005;</button>
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Durée de validité du lien</label>
+      <div class="frow2">
+        <input type="number" id="share-duration" value="7" min="1" max="365" placeholder="7">
+        <select id="share-duration-unit">
+          <option value="hours">Heures</option>
+          <option value="days" selected>Jours</option>
+          <option value="months">Mois</option>
+        </select>
+      </div>
+    </div>
+    <div id="share-link-result" style="display:none">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:.5rem">Lien généré :</div>
+      <div class="share-link-box" id="share-link-text"></div>
+      <button class="btn btn-sm" onclick="copyShareLink()">&#128203; Copier le lien</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:.5rem" id="share-link-expiry"></div>
+    </div>
+    <div class="mactions">
+      <button class="btn" onclick="closeModal('modal-share')">Fermer</button>
+      <button class="btn btn-primary" id="generate-share-btn" onclick="generateShareLink()">&#128279; Générer le lien</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
