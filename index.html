@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -314,6 +313,7 @@ create table if not exists responses (
   graded boolean default false,
   group_members jsonb default '[]',
   signature text,
+  comments jsonb default '{}',
   created_at timestamptz default now()
 );
 
@@ -643,6 +643,8 @@ async function renderDashboard(){
       <div class="stat-card"><div class="stat-lbl">Réponses totales</div><div class="stat-val">${(rs||[]).length}</div><div class="stat-sub">soumissions reçues</div></div>
       <div class="stat-card"><div class="stat-lbl">Aujourd&#39;hui</div><div class="stat-val">${todayRs}</div><div class="stat-sub">nouvelles réponses</div></div>
       <div class="stat-card"><div class="stat-lbl">Questionnaires actifs</div><div class="stat-val">${(qs||[]).filter(q=>q.active).length}</div><div class="stat-sub">acceptent des réponses</div></div>
+      <div class="stat-card"><div class="stat-lbl">Taux de correction</div><div class="stat-val">${(rs||[]).length>0?Math.round((rs||[]).filter(r=>r.graded).length/(rs||[]).length*100):0}%</div><div class="stat-sub">${(rs||[]).filter(r=>r.graded).length} corrigée(s)</div></div>
+      <div class="stat-card"><div class="stat-lbl">Note moyenne</div><div class="stat-val">${(()=>{const g=(rs||[]).filter(r=>r.score_pct!=null);return g.length>0?Math.round(g.reduce((a,r)=>a+r.score_pct,0)/g.length)+'%':'—';})()}</div><div class="stat-sub">sur les évals notées</div></div>
     </div>
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
@@ -656,7 +658,7 @@ async function renderDashboard(){
         <td><span class="badge ${TC[q.type]||'bg-gray'}">${TL[q.type]||q.type}</span></td>
         <td><button class="btn btn-xs" onclick="viewResponses('${q.id}')">${qrs}</button></td>
         <td><span class="badge ${q.active?'bg-green':'bg-gray'}">${q.active?'Actif':'Inactif'}</span></td>
-        <td><div style="display:flex;gap:4px"><button class="btn btn-xs" onclick="shareQ('${q.id}','${q.code}')">🔗</button><button class="btn btn-xs" onclick="viewResponses('${q.id}')">📥</button></div></td>
+        <td><div style="display:flex;gap:4px"><button class="btn btn-xs" onclick="shareQ('${q.id}','${q.code}')" title="Partager">🔗</button><button class="btn btn-xs" onclick="previewQ('${q.id}')" title="Prévisualiser">👁</button><button class="btn btn-xs" onclick="viewResponses('${q.id}')">📥</button></div></td>
       </tr>`}).join('')}</tbody></table>`}
     </div>
     ${(rs||[]).length?`<div class="card"><div class="sec-title">Dernières réponses</div>${(rs||[]).slice(0,5).map(r=>{const q=(qs||[]).find(x=>x.id===r.questionnaire_id);return`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:.5px solid var(--border)"><div><strong style="font-size:13px">${esc(r.respondent_name)}</strong> <span style="font-size:12px;color:var(--text3)">${esc(r.respondent_email)}</span><br><span style="font-size:11px;color:var(--text3)">${q?esc(q.title):'?'} — ${fmt(r.created_at)}</span></div><button class="btn btn-xs" onclick="viewResponses('${r.questionnaire_id}')">Voir</button></div>`}).join('')}</div>`:''}`;
@@ -681,11 +683,66 @@ async function renderQuestionnaires(){
       <td style="font-size:12px;color:var(--text3)">${fmt(q.created_at)}</td>
       <td><span class="badge ${q.active?'bg-green':'bg-gray'}" style="cursor:pointer" onclick="toggleActive('${q.id}',${!q.active})">${q.active?'✓ Actif':'⏸ Inactif'}</span></td>
       <td><div style="display:flex;gap:4px">
-        <button class="btn btn-xs" onclick="shareQ('${q.id}','${q.code}')">🔗</button>
-        <button class="btn btn-xs" onclick="editQ('${q.id}')">✏️</button>
-        <button class="btn btn-xs btn-danger" onclick="deleteQ('${q.id}')">🗑</button>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-xs" onclick="shareQ(\'${q.id}\',\'${q.code}\')" title="Partager">🔗</button>
+        <button class="btn btn-xs" onclick="previewQ(\'${q.id}\')" title="Aperçu">👁️</button>
+        <button class="btn btn-xs" onclick="duplicateQ(\'${q.id}\')" title="Dupliquer">⧉</button>
+        <button class="btn btn-xs" onclick="editQ(\'${q.id}\')" title="Modifier">✏️</button>
       </div></td>
     </tr>`}).join('')}</tbody></table></div>`}`;
+}
+
+// ─── 1. DUPLICATION ──────────────────────────────────
+async function duplicateQ(id){
+  const{data:q}=await SB.from('questionnaires').select('*').eq('id',id).single();
+  if(!q){toast('Introuvable.','error');return;}
+  const newQ={
+    ...q,
+    id:uid(),
+    code:uid().slice(0,6),
+    title:q.title+' (copie)',
+    created_at:undefined
+  };
+  delete newQ.created_at;
+  const{error}=await SB.from('questionnaires').insert(newQ);
+  if(error){toast('Erreur: '+error.message,'error');return;}
+  toast('Questionnaire dupliqué avec succès !');
+  renderQuestionnaires();
+}
+
+// ─── 2. APERÇU (PREVIEW) ─────────────────────────────
+function previewQ(id){
+  SB.from('questionnaires').select('*').eq('id',id).single().then(({data:q})=>{
+    if(!q){toast('Introuvable.','error');return;}
+    // Ouvrir en mode preview (sans soumission réelle)
+    const prev=document.createElement('div');
+    prev.id='preview-overlay';
+    prev.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;overflow-y:auto';
+    prev.innerHTML='<div style="max-width:740px;margin:2rem auto;padding:0 1rem 4rem">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">'
+      +'<span style="background:#amber;color:#854f0b;font-size:12px;font-weight:600;padding:4px 12px;border-radius:99px;background:#faeeda">👁 MODE APERÇU — Soumission désactivée</span>'
+      +'<button onclick="document.getElementById('preview-overlay').remove()" style="background:#fff;border:none;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:500">✕ Fermer</button>'
+      +'</div>'
+      +'<div id="preview-content"></div></div>';
+    document.body.appendChild(prev);
+    // Sauvegarder curQ et rendre le form
+    const savedQ=curQ; const savedAns=rAns;
+    curQ=q; rAns={};
+    groupMembers=[{name:'',email:'',genre:'',fonction:'',structure:''}];
+    // Rendre dans le preview
+    const tmpEl=document.getElementById('r-content');
+    document.getElementById('r-content').id='r-content-bak';
+    const previewDiv=document.getElementById('preview-content');
+    previewDiv.id='r-content';
+    renderRForm(q);
+    // Désactiver le bouton submit
+    const btn=document.getElementById('submit-btn');
+    if(btn){btn.disabled=true;btn.textContent='Aperçu uniquement';}
+    // Restaurer
+    previewDiv.id='preview-content';
+    document.getElementById('r-content-bak').id='r-content';
+    curQ=savedQ; rAns=savedAns;
+  });
 }
 
 async function toggleActive(id,val){await SB.from('questionnaires').update({active:val}).eq('id',id);renderQuestionnaires();}
@@ -1046,9 +1103,46 @@ async function renderResponses(){
   const[{data:rs},{data:qs}]=await Promise.all([SB.from('responses').select('*').order('created_at',{ascending:false}),SB.from('questionnaires').select('id,title')]);
   updateBadges();
   document.getElementById('content').innerHTML=`
-    <div class="pg-title">Réponses reçues</div><div class="pg-sub">Toutes les soumissions — synchronisées en temps réel depuis Supabase.</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1rem">
+      <div><div class="pg-title" style="margin-bottom:.25rem">Réponses reçues</div><div style="font-size:13px;color:var(--text2)">${(rs||[]).length} soumission${(rs||[]).length>1?'s':''} — synchronisées en temps réel</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="text" id="search-resp" placeholder="🔍 Rechercher par nom, email..." style="font-size:13px;padding:7px 12px;width:240px;border-radius:var(--r)" oninput="filterResponses()" onkeyup="filterResponses()">
+        <select id="filter-graded" style="font-size:13px;padding:7px 10px;border-radius:var(--r)" onchange="filterResponses()">
+          <option value="all">Tous les statuts</option>
+          <option value="graded">Corrigés</option>
+          <option value="pending">En attente</option>
+        </select>
+        <select id="filter-q" style="font-size:13px;padding:7px 10px;border-radius:var(--r)" onchange="filterResponses()">
+          <option value="all">Tous les questionnaires</option>
+          ${(qs||[]).map(q=>'<option value="'+q.id+'">'+esc(q.title.slice(0,30))+'</option>').join('')}
+        </select>
+      </div>
+    </div>
     ${!(rs||[]).length?`<div class="card"><div class="empty"><div class="empty-icon">📥</div><div class="empty-title">Aucune réponse</div><div class="empty-sub">Partagez vos questionnaires pour recevoir des réponses.</div></div></div>`
-    :`<div>${(rs||[]).map(r=>{const q=(qs||[]).find(x=>x.id===r.questionnaire_id);return`<div class="resp-item"><div class="resp-meta"><div><div style="font-weight:500;font-size:14px">${esc(r.respondent_name)}</div><div style="font-size:12px;color:var(--text2)">${esc(r.respondent_email)}</div><div style="font-size:11px;color:var(--text3);margin-top:3px">${q?esc(q.title):'?'} — ${fmt(r.created_at)}</div></div><div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="viewResponses('${r.questionnaire_id}')">Voir</button><button class="btn btn-xs btn-danger" onclick="delResp('${r.id}')">🗑</button></div></div></div>`;}).join('')}</div>`}`;
+    :`<div id="resp-list-container">${(rs||[]).map(r=>{const q=(qs||[]).find(x=>x.id===r.questionnaire_id);return`<div class="resp-item" data-name="${(r.respondent_name||'').toLowerCase()}" data-email="${(r.respondent_email||'').toLowerCase()}" data-graded="${r.graded?'graded':'pending'}" data-qid="${r.questionnaire_id}"><div class="resp-meta"><div><div style="font-weight:500;font-size:14px">${esc(r.respondent_name)}</div><div style="font-size:12px;color:var(--text2)">${esc(r.respondent_email)}</div><div style="font-size:11px;color:var(--text3);margin-top:3px">${q?esc(q.title):'?'} — ${fmt(r.created_at)}</div></div><div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="viewResponses('${r.questionnaire_id}')">Voir</button><button class="btn btn-xs btn-danger" onclick="delResp('${r.id}')">🗑</button></div></div></div>`;}).join('')}</div>`}`;
+}
+
+function filterResponses(){
+  const search=(document.getElementById('search-resp')?.value||'').toLowerCase().trim();
+  const graded=document.getElementById('filter-graded')?.value||'all';
+  const qFilter=document.getElementById('filter-q')?.value||'all';
+  const cards=document.querySelectorAll('#resp-list-container .resp-item');
+  let visible=0;
+  cards.forEach(card=>{
+    const name=card.dataset.name||'';
+    const email=card.dataset.email||'';
+    const cardGraded=card.dataset.graded||'pending';
+    const cardQid=card.dataset.qid||'';
+    const matchSearch=!search||(name.includes(search)||email.includes(search));
+    const matchGraded=graded==='all'||cardGraded===graded;
+    const matchQ=qFilter==='all'||cardQid===qFilter;
+    const show=matchSearch&&matchGraded&&matchQ;
+    card.style.display=show?'':'none';
+    if(show)visible++;
+  });
+  // Afficher compteur
+  const sub=document.querySelector('.pg-sub');
+  if(sub&&search) sub.textContent=visible+' résultat'+(visible>1?'s':'')+' trouvé'+(visible>1?'s':'');
 }
 
 async function delResp(id){
@@ -1159,6 +1253,9 @@ async function viewResponses(qid){
           '<span style="font-size:11px;color:var(--text3)">/ '+pts+'</span>'+
           caHint+
         '</div>'+
+        '<div style="margin-top:.5rem">'+
+          '<input type="text" placeholder="💬 Commentaire de correction (optionnel)..." id="comment-'+r.id+'-'+qq.id+'" value="'+esc((r.comments&&r.comments[qq.id])||'')+'" style="font-size:12px;padding:6px 10px;border-radius:6px;width:100%">'+
+        '</div>'+
       '</div>';
     }).join('');
 
@@ -1221,9 +1318,16 @@ async function saveGrade(rid,qid){
     }
   });
   const pct=totalPts>0?Math.round(earned/totalPts*100):0;
+  // Collecter les commentaires
+  const comments={};
+  (q.questions||[]).forEach(qq=>{
+    const cel=document.getElementById('comment-'+rid+'-'+qq.id);
+    if(cel&&cel.value.trim())comments[qq.id]=cel.value.trim();
+  });
   await SB.from('responses').update({
     manual_scores:manSc,final_score:earned,
-    total_points:totalPts,score_pct:pct,graded:true
+    total_points:totalPts,score_pct:pct,graded:true,
+    comments:Object.keys(comments).length>0?comments:null
   }).eq('id',rid);
   toast('Note enregistrée : '+earned+'/'+totalPts+' pts ('+pct+'%)');
   viewResponses(qid);
