@@ -2284,64 +2284,316 @@ function startTimer(q){
   }
   tick();timerInterval=setInterval(tick,1000);
 }
-function generatePDF(q,members,answers,sigData,scoreInfo){
+function generatePDF(q, members, answers, sigData, scoreInfo){
   try{
     const{jsPDF}=window.jspdf;
-    if(!jsPDF)return null;
+    if(!jsPDF) return null;
     const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
-    const W=210,margin=20;let y=margin;
-    doc.setFillColor(26,26,46);doc.rect(0,0,W,40,'F');
-    doc.setTextColor(255,255,255);doc.setFontSize(18);doc.setFont('helvetica','bold');
-    doc.text(q.title,W/2,18,{align:'center'});
-    doc.setFontSize(10);doc.setFont('helvetica','normal');
-    doc.text('Rapport — '+new Date().toLocaleDateString('fr-FR'),W/2,28,{align:'center'});
-    y=50;
-    if(scoreInfo){
-      doc.setFillColor(245,243,255);doc.roundedRect(margin,y,W-2*margin,24,4,4,'F');
-      doc.setTextColor(76,29,149);doc.setFontSize(14);doc.setFont('helvetica','bold');
-      doc.text('Note : '+scoreInfo.earned+' / '+scoreInfo.totalPts+' pts ('+scoreInfo.pct+'%)',W/2,y+10,{align:'center'});
-      const men=getMention(scoreInfo.pct);doc.setFontSize(11);doc.text(men.txt,W/2,y+18,{align:'center'});y+=30;
+    const W=210, margin=18;
+    let y=margin;
+
+    // ── Helpers ──────────────────────────────────────────
+    function newPageIfNeeded(needed){
+      if(y+needed>275){doc.addPage();y=20;}
     }
-    doc.setTextColor(26,26,46);doc.setFontSize(12);doc.setFont('helvetica','bold');
-    doc.text('Informations',margin,y);y+=6;
-    doc.setDrawColor(108,99,255);doc.setLineWidth(0.5);doc.line(margin,y,W-margin,y);y+=6;
-    (members||[]).forEach(m=>{
-      doc.setFontSize(10);doc.setFont('helvetica','normal');doc.setTextColor(26,26,46);
-      [m.name?'Nom: '+m.name:'',m.email?'Email: '+m.email:'',m.genre?'Genre: '+m.genre:'',m.fonction?'Fonction: '+m.fonction:'',m.structure?'Structure: '+m.structure:''].filter(Boolean).forEach(info=>{if(y>270){doc.addPage();y=20;}doc.text(info,margin+4,y);y+=5;});
-      y+=2;
+    function setFont(style,size,color){
+      doc.setFont('helvetica',style||'normal');
+      doc.setFontSize(size||10);
+      if(color) doc.setTextColor(color[0],color[1],color[2]);
+      else doc.setTextColor(40,40,40);
+    }
+    function drawSection(title){
+      newPageIfNeeded(14);
+      setFont('bold',12,[26,26,46]);
+      doc.text(title,margin,y);y+=5;
+      doc.setDrawColor(108,99,255);doc.setLineWidth(0.4);
+      doc.line(margin,y,W-margin,y);y+=6;
+    }
+    function answerStatus(qq, ans){
+      // Retourne: 'correct'|'wrong'|'partial'|'manual'|'none'
+      if(!scoreInfo) return 'none'; // pas noté
+      const ca=qq.correctAnswer;
+      if(ca===null||ca===undefined) return 'manual';
+      if(qq.type==='qcm'){
+        if(ans===undefined||ans===null) return 'wrong';
+        const correct=qq.options&&qq.options[ca];
+        return ans===correct?'correct':'wrong';
+      }
+      if(qq.type==='yesno'){
+        if(!ans) return 'wrong';
+        return ans===ca?'correct':'wrong';
+      }
+      if(qq.type==='checkbox'){
+        if(!Array.isArray(ans)||!Array.isArray(ca)) return 'manual';
+        const sorted=a=>[...a].sort().join(',');
+        const got=sorted(ans);
+        const exp=sorted(ca.map(i=>qq.options[i]));
+        return got===exp?'correct':got.length?'partial':'wrong';
+      }
+      if(qq.type==='scale') return 'none';
+      if(qq.type==='text') return 'manual';
+      if(qq.type==='table') return 'manual';
+      return 'none';
+    }
+    const STATUS_COLOR={
+      correct:[34,197,94],   // vert
+      wrong:[239,68,68],     // rouge
+      partial:[234,179,8],   // orange
+      manual:[99,102,241],   // violet
+      none:[120,120,120]     // gris
+    };
+    const STATUS_LABEL={
+      correct:'Correct',
+      wrong:'Incorrect',
+      partial:'Partiel',
+      manual:'Correction manuelle',
+      none:''
+    };
+
+    // ── HEADER ───────────────────────────────────────────
+    doc.setFillColor(26,26,46);
+    doc.rect(0,0,W,42,'F');
+    doc.setFillColor(108,99,255);
+    doc.rect(0,38,W,4,'F');
+    setFont('bold',20,[255,255,255]);
+    doc.text(q.title,W/2,16,{align:'center'});
+    setFont('normal',10,[180,180,220]);
+    doc.text('Rapport de résultats — '+new Date().toLocaleDateString('fr-FR'),W/2,28,{align:'center'});
+    y=52;
+
+    // ── SCORE BANNER ─────────────────────────────────────
+    if(scoreInfo){
+      const pct=scoreInfo.pct;
+      const men=getMention(pct);
+      const bgCol=pct>=75?[240,253,244]:pct>=50?[254,249,195]:[254,242,242];
+      const txCol=pct>=75?[22,101,52]:pct>=50?[113,63,18]:[153,27,27];
+      doc.setFillColor(bgCol[0],bgCol[1],bgCol[2]);
+      doc.roundedRect(margin,y,W-2*margin,32,4,4,'F');
+      doc.setDrawColor(bgCol[0]-20,bgCol[1]-20,bgCol[2]-20);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(margin,y,W-2*margin,32,4,4,'S');
+      setFont('bold',22,txCol);
+      doc.text(scoreInfo.earned+' / '+scoreInfo.totalPts+' pts',W/2,y+13,{align:'center'});
+      setFont('bold',12,txCol);
+      doc.text(pct+'%  —  '+men.txt,W/2,y+23,{align:'center'});
+      // Barre de progression
+      const barW=W-2*margin-10;
+      const barX=margin+5;
+      const barY=y+28;
+      doc.setFillColor(220,220,220);
+      doc.roundedRect(barX,barY,barW,4,2,2,'F');
+      const fillW=Math.round(barW*pct/100);
+      const fillCol=pct>=75?[34,197,94]:pct>=50?[234,179,8]:[239,68,68];
+      doc.setFillColor(fillCol[0],fillCol[1],fillCol[2]);
+      doc.roundedRect(barX,barY,fillW,4,2,2,'F');
+      y+=40;
+    }
+
+    // ── INFORMATIONS RÉPONDANT ────────────────────────────
+    drawSection('Informations du répondant');
+    (members||[]).forEach((m,mi)=>{
+      if(members.length>1){
+        setFont('bold',10,[108,99,255]);
+        newPageIfNeeded(6);
+        doc.text('Membre '+(mi+1),margin+4,y);y+=5;
+      }
+      const infos=[
+        m.name?['Nom',m.name]:[],
+        m.email?['Email',m.email]:[],
+        m.genre?['Genre',m.genre]:[],
+        m.fonction?['Fonction',m.fonction]:[],
+        m.structure?['Structure',m.structure]:[]
+      ].filter(a=>a.length);
+      infos.forEach(([lbl,val])=>{
+        newPageIfNeeded(6);
+        setFont('bold',9,[100,100,100]);
+        doc.text(lbl+' :',margin+4,y);
+        setFont('normal',9,[40,40,40]);
+        doc.text(val,margin+30,y);
+        y+=5;
+      });
+      if(mi<members.length-1) y+=3;
     });
     y+=4;
-    doc.setFontSize(12);doc.setFont('helvetica','bold');doc.setTextColor(26,26,46);
-    doc.text('Réponses',margin,y);y+=6;
-    doc.setDrawColor(108,99,255);doc.line(margin,y,W-margin,y);y+=6;
+
+    // ── RÉPONSES ─────────────────────────────────────────
+    drawSection('Réponses aux questions');
+
     (q.questions||[]).forEach((qq,i)=>{
-      if(y>260){doc.addPage();y=20;}
-      doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(26,26,46);
-      const lbl=doc.splitTextToSize((i+1)+'. '+(qq.label||qq.type),W-2*margin-10);
-      doc.text(lbl,margin,y);y+=lbl.length*5+2;
-      doc.setFont('helvetica','normal');doc.setTextColor(80,80,80);
       const ans=(answers||{})[qq.id];
-      if(qq.type==='table'&&ans&&ans.rows){
-        ans.rows.forEach((rw,ri)=>{
-          if(y>260){doc.addPage();y=20;}
-          const t='Ligne '+(ri+1)+': '+(rw.phrase||'')+(rw.cols&&rw.cols.length?' | '+rw.cols.join(' | '):'');
-          const ls=doc.splitTextToSize(t,W-2*margin-14);doc.text(ls,margin+8,y);y+=ls.length*5+1;
-        });y+=2;return;
+      const status=answerStatus(qq,ans);
+      const stColor=STATUS_COLOR[status]||[120,120,120];
+      const ca=qq.correctAnswer;
+
+      newPageIfNeeded(20);
+
+      // Numéro + label question
+      const qLabel=doc.splitTextToSize((i+1)+'. '+(qq.label||'Question '+(i+1)),W-2*margin-14);
+      const qHeight=qLabel.length*5+2;
+      newPageIfNeeded(qHeight+16);
+
+      // Fond coloré selon statut
+      if(status!=='none'&&status!=='manual'){
+        doc.setFillColor(stColor[0],stColor[1],stColor[2],0.08);
+        doc.setFillColor(
+          status==='correct'?240:status==='wrong'?255:255,
+          status==='correct'?253:status==='wrong'?242:249,
+          status==='correct'?244:status==='wrong'?242:195
+        );
+        doc.roundedRect(margin,y-2,W-2*margin,qHeight+14,3,3,'F');
       }
-      let ansStr=Array.isArray(ans)?ans.join(', '):(ans!==null&&ans!==undefined?String(ans):'—');
-      const ls=doc.splitTextToSize(ansStr,W-2*margin-8);
-      if(y+ls.length*5>270){doc.addPage();y=20;}
-      doc.text(ls,margin+8,y);y+=ls.length*5+4;
+
+      // Label question
+      setFont('bold',10,[26,26,46]);
+      doc.text(qLabel,margin+4,y);
+      y+=qLabel.length*5+2;
+
+      // Badge statut (à droite)
+      if(STATUS_LABEL[status]){
+        const badgeX=W-margin-2;
+        const badgeTxt=STATUS_LABEL[status];
+        setFont('bold',8,stColor);
+        doc.text(badgeTxt,badgeX,y-qLabel.length*5-1,{align:'right'});
+      }
+
+      // Réponse donnée
+      if(qq.type==='table'&&ans&&ans.rows){
+        // Tableau : afficher ligne par ligne avec statut par cellule
+        ans.rows.forEach((rw,ri)=>{
+          newPageIfNeeded(18);
+          const rowCA=Array.isArray(ca)?ca[ri]:null;
+          const phraseAdm=(qq.rows&&qq.rows[ri])||rw.phrase||'Ligne '+(ri+1);
+
+          // Phrase de la ligne
+          setFont('bold',9,[60,60,60]);
+          const phLines=doc.splitTextToSize(phraseAdm,W-2*margin-8);
+          doc.text(phLines,margin+4,y);y+=phLines.length*5+1;
+
+          // Colonnes
+          (qq.columns||[]).forEach((col,ci)=>{
+            const got=((rw.cols&&rw.cols[ci])||'').trim();
+            const cell=rowCA&&rowCA[ci];
+            const expAns=cell&&typeof cell==='object'?cell.answer||'':cell||'';
+            const cellPts=cell&&typeof cell==='object'?+(cell.points||0):0;
+            const isCorrect=expAns&&got.toLowerCase()===expAns.toLowerCase();
+            const hasExp=expAns.trim()!=='';
+
+            newPageIfNeeded(10);
+            setFont('normal',9,[80,80,80]);
+            doc.text(col+' :',margin+8,y);
+
+            if(got){
+              const cellColor=!hasExp?[80,80,80]:isCorrect?[22,101,52]:[153,27,27];
+              setFont('bold',9,cellColor);
+              doc.text(got,margin+42,y);
+            } else {
+              setFont('normal',9,[150,150,150]);
+              doc.text('(non renseigné)',margin+42,y);
+            }
+
+            // Si mauvaise réponse, afficher la bonne
+            if(hasExp&&!isCorrect&&scoreInfo){
+              y+=4;
+              newPageIfNeeded(5);
+              setFont('normal',8,[22,101,52]);
+              doc.text('Attendu : '+expAns+(cellPts?' ('+cellPts+' pt'+(cellPts>1?'s':'')+')'  :''),margin+12,y);
+            }
+            y+=5;
+          });
+          y+=2;
+        });
+
+      } else {
+        // Autres types de questions
+        let ansStr='—';
+        let ansColor=[80,80,80];
+        let correct=false;
+
+        if(qq.type==='qcm'){
+          ansStr=ans||'(sans réponse)';
+          const correctAns=qq.options&&qq.options[ca];
+          correct=ans===correctAns;
+          ansColor=scoreInfo?(correct?[22,101,52]:[153,27,27]):[80,80,80];
+        } else if(qq.type==='yesno'){
+          ansStr=ans||'(sans réponse)';
+          correct=ans===ca;
+          ansColor=scoreInfo&&ca?(correct?[22,101,52]:[153,27,27]):[80,80,80];
+        } else if(qq.type==='checkbox'){
+          ansStr=Array.isArray(ans)&&ans.length?ans.join(', '):'(sans réponse)';
+          ansColor=[80,80,80];
+        } else if(qq.type==='scale'){
+          ansStr=ans!==undefined&&ans!==null?'Niveau '+ans:'(sans réponse)';
+        } else {
+          ansStr=ans||'(sans réponse)';
+        }
+
+        const ansLines=doc.splitTextToSize(ansStr,W-2*margin-14);
+        newPageIfNeeded(ansLines.length*5+4);
+
+        // Fond réponse
+        doc.setFillColor(248,248,248);
+        doc.roundedRect(margin+4,y-3,W-2*margin-8,ansLines.length*5+4,2,2,'F');
+        setFont('normal',10,ansColor);
+        doc.text(ansLines,margin+7,y);
+        y+=ansLines.length*5+3;
+
+        // Si mauvaise réponse : afficher la bonne réponse
+        if(scoreInfo&&!correct&&ca!==null&&ca!==undefined&&(qq.type==='qcm'||qq.type==='yesno')){
+          const correctAns=qq.type==='qcm'?(qq.options&&qq.options[ca]):ca;
+          const corrLabel='Bonne reponse : '+(correctAns||'');
+          const corrLines=doc.splitTextToSize(corrLabel,W-2*margin-14);
+          newPageIfNeeded(corrLines.length*5+4);
+          doc.setFillColor(240,253,244);
+          doc.roundedRect(margin+4,y-3,W-2*margin-8,corrLines.length*5+4,2,2,'F');
+          setFont('bold',9,[22,101,52]);
+          doc.text(corrLines,margin+7,y);
+          y+=corrLines.length*5+2;
+        }
+      }
+
+      // Commentaire correcteur
+      const comment=q.comments&&q.comments[qq.id];
+      if(comment){
+        newPageIfNeeded(12);
+        const cmLines=doc.splitTextToSize('Commentaire : '+comment,W-2*margin-14);
+        doc.setFillColor(239,246,255);
+        doc.roundedRect(margin+4,y-2,W-2*margin-8,cmLines.length*5+4,2,2,'F');
+        setFont('normal',9,[29,78,216]);
+        doc.text(cmLines,margin+7,y);
+        y+=cmLines.length*5+3;
+      }
+
+      y+=4;
     });
+
+    // ── SIGNATURE ────────────────────────────────────────
     if(sigData){
-      if(y>240){doc.addPage();y=20;}
-      doc.setFontSize(11);doc.setFont('helvetica','bold');doc.setTextColor(26,26,46);
-      doc.text('Signature',margin,y);y+=6;
-      try{doc.addImage(sigData,'PNG',margin,y,80,30);}catch(e){}
+      newPageIfNeeded(48);
+      drawSection('Signature');
+      try{
+        doc.addImage(sigData,'PNG',margin,y,80,30);
+        y+=36;
+      }catch(e){}
     }
+
+    // ── PIED DE PAGE sur toutes les pages ────────────────
+    const totalPages=doc.getNumberOfPages();
+    for(let p=1;p<=totalPages;p++){
+      doc.setPage(p);
+      setFont('normal',8,[150,150,150]);
+      doc.text('EvalPro — '+q.title,margin,290);
+      doc.text('Page '+p+' / '+totalPages,W-margin,290,{align:'right'});
+      doc.setDrawColor(200,200,200);doc.setLineWidth(0.3);
+      doc.line(margin,287,W-margin,287);
+    }
+
     return doc.output('datauristring').split(',')[1];
-  }catch(e){console.warn('PDF error:',e);return null;}
+  }catch(e){
+    console.warn('PDF generation error:',e);
+    return null;
+  }
 }
+
 function downloadPDF(q,members,answers,sigData,scoreInfo){
   const b64=generatePDF(q,members,answers,sigData,scoreInfo);
   if(!b64){toast('Impossible de générer le PDF.','error');return;}
