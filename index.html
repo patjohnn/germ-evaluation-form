@@ -3725,7 +3725,7 @@ function openShareModal(rid){
   document.getElementById('share-duration-unit').value = 'days';
   document.getElementById('share-link-result').style.display = 'none';
   document.getElementById('generate-share-btn').disabled = false;
-  openModal('modal-share');
+  openModal('modal-share-result');
 }
 
 async function generateShareLink(){
@@ -4047,11 +4047,11 @@ init();
 </div>
 
 <!-- MODAL: Partage résultats -->
-<div class="modal-overlay" id="modal-share">
+<div class="modal-overlay" id="modal-share-result">>
   <div class="modal" style="max-width:480px">
     <div class="mhdr">
       <div><div class="mtitle">Partager les résultats</div><div class="msub">Générer un lien de lecture seule</div></div>
-      <button class="close-btn" onclick="closeModal('modal-share')">&#10005;</button>
+      <button class="close-btn" onclick="closeModal('modal-share-result')">&#10005;</button>
     </div>
     <div class="fgroup">
       <label class="flabel">Durée de validité du lien</label>
@@ -4071,7 +4071,7 @@ init();
       <div style="font-size:11px;color:var(--text3);margin-top:.5rem" id="share-link-expiry"></div>
     </div>
     <div class="mactions">
-      <button class="btn" onclick="closeModal('modal-share')">Fermer</button>
+      <button class="btn" onclick="closeModal('modal-share-result')">Fermer</button>
       <button class="btn btn-primary" id="generate-share-btn" onclick="generateShareLink()">&#128279; Générer le lien</button>
     </div>
   </div>
