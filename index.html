@@ -1774,7 +1774,7 @@ function renderSettings(){
 }
 
 // ─── RESPONDENT ───────────────────────────────────────
-let curQ=null, rAns={};
+let curQ=null; rAns={};
 
 async function openRespondentByCode(){
   const code=document.getElementById('resp-code').value.trim().toUpperCase();
@@ -1799,6 +1799,61 @@ function openRView(q){
   document.getElementById('r-title').textContent=q.title;
   renderRForm(q);
 }
+
+// ─── ETAT REPONDANT ──────────────────────────────────
+var rAns = {};
+var timerInterval = null;
+var sigDrawing = false, sigCtx = null;
+
+const selQCM = (qid, oi, val) => {
+  rAns[qid] = val;
+  document.querySelectorAll('[id^="ro-' + qid + '-"]').forEach((el, i) => {
+    el.className = 'r-opt' + (i === oi ? ' selected' : '');
+    const d = document.getElementById('dot-' + qid + '-' + i);
+    if (d) d.style.background = i === oi ? 'var(--text)' : '';
+  });
+};
+
+const togChk = (qid, oi, val) => {
+  if (!Array.isArray(rAns[qid])) rAns[qid] = [];
+  const ix = rAns[qid].indexOf(val);
+  if (ix >= 0) rAns[qid].splice(ix, 1); else rAns[qid].push(val);
+  const el = document.getElementById('co-' + qid + '-' + oi);
+  const sq = document.getElementById('sq-' + qid + '-' + oi);
+  if (el) el.className = 'r-opt' + (rAns[qid].includes(val) ? ' selected' : '');
+  if (sq) sq.style.background = rAns[qid].includes(val) ? 'var(--text)' : '';
+};
+
+const selYN = (qid, val) => {
+  rAns[qid] = val;
+  ['Oui', 'Non', 'Sans avis'].forEach(v => {
+    const b = document.getElementById('yn-' + qid + '-' + v);
+    if (b) {
+      b.style.background = v === val ? 'var(--text)' : '';
+      b.style.color = v === val ? 'var(--bg)' : '';
+      b.style.borderColor = v === val ? 'var(--text)' : '';
+    }
+  });
+};
+
+const selSc = (qid, val) => {
+  rAns[qid] = val;
+  document.querySelectorAll('[id^="sc-' + qid + '-"]').forEach(el => {
+    const n = +el.id.split('-').pop();
+    el.className = 'scale-btn' + (n === val ? ' selected' : '');
+  });
+};
+
+const uTA = (qid, ri, kci, val) => {
+  if (!rAns[qid]) rAns[qid] = {rows: []};
+  if (!rAns[qid].rows[ri]) rAns[qid].rows[ri] = {phrase: '', cols: []};
+  if (kci === 'phrase') {
+    rAns[qid].rows[ri].phrase = val;
+  } else {
+    if (!rAns[qid].rows[ri].cols) rAns[qid].rows[ri].cols = [];
+    rAns[qid].rows[ri].cols[kci] = val;
+  }
+};
 
 // Membres du groupe
 let groupMembers=[{name:'',email:'',genre:'',fonction:'',structure:''}];
