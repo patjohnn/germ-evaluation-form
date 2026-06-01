@@ -636,6 +636,19 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     </div>
     <div class="fgroup"><label class="flabel">Description / consignes</label><textarea id="q-desc" rows="2" placeholder="Instructions pour les répondants..."></textarea></div>
     <div class="fgroup"><label class="flabel">Texte de référence (affiché en lecture seule aux répondants)</label><textarea id="q-ref" rows="4" placeholder="Collez ici le texte de l'étude de cas ou le document à analyser..."></textarea></div>
+    <div style="background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:1rem;margin-bottom:1rem">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:.75rem">&#128197; Planification de l&#39;évaluation <span style="font-weight:400;color:var(--text3)">(optionnel — laissez vide pour accès permanent)</span></div>
+      <div class="frow2">
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">&#9654; Date et heure de début</label>
+          <input type="datetime-local" id="q-start-at">
+        </div>
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">&#9646; Date et heure de fin</label>
+          <input type="datetime-local" id="q-end-at">
+        </div>
+      </div>
+    </div>
     <div class="frow3" style="margin-bottom:1rem">
       <div class="fgroup" style="margin-bottom:0"><label class="flabel">Soumissions autorisées</label>
         <select id="q-max-attempts"><option value="1">1 fois</option><option value="2">2 fois</option><option value="0">Illimité</option></select>
@@ -658,25 +671,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
         <div style="font-size:11px;color:var(--text3);padding-bottom:6px">0 = pas de limite de temps</div>
       </div>
     </div>
-    <div style="background:var(--bg2);border:.5px solid var(--border);border-radius:var(--rl);padding:1rem;margin-bottom:1rem">
-      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:.75rem">&#128197; Planification de l'évaluation <span style="font-weight:400;color:var(--text3)">(optionnel)</span></div>
-      <div class="frow2" style="margin-bottom:.75rem">
-        <div class="fgroup" style="margin-bottom:0">
-          <label class="flabel">Date et heure de début</label>
-          <input type="datetime-local" id="q-start-at">
-        </div>
-        <div class="fgroup" style="margin-bottom:0">
-          <label class="flabel">Date et heure de fin</label>
-          <input type="datetime-local" id="q-end-at">
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--text3);line-height:1.5">
-        Laissez vide pour aucune restriction de période. Si défini, les répondants ne pourront accéder au formulaire qu'entre ces deux dates.
-      </div>
-    </div>
-    <div class="frow3" style="margin-bottom:1rem;display:none"><!-- placeholder --></div>
-    <div class="frow3" style="margin-bottom:1rem">
-    </div>
+
     <div class="fgroup" style="margin-bottom:1rem">
       <label class="flabel">EmailJS — envoi PDF automatique <span style="font-weight:400;color:var(--text3)">(optionnel, emailjs.com gratuit)</span></label>
       <div class="frow3">
