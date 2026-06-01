@@ -372,8 +372,31 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
 .role-admin{background:var(--purple-bg);color:var(--purple-text)}
 .role-corrector{background:var(--blue-bg);color:var(--blue-text)}
 .role-viewer{background:var(--green-bg);color:var(--green-text)}
+.stats-q-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rl);padding:1.25rem;margin-bottom:1rem}
+.stat-big{font-size:32px;font-weight:800;color:var(--text);line-height:1}
+.stat-sub-lbl{font-size:12px;color:var(--text3);margin-top:2px}
+.bar-chart-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+.bar-chart-bar{height:20px;border-radius:4px;background:var(--q-color);min-width:2px;transition:width .5s}
+.bar-chart-lbl{width:100px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-chart-val{color:var(--text3);min-width:30px}
+.dist-bar{display:flex;align-items:flex-end;gap:3px;height:80px;padding:0 4px}
+.dist-col{flex:1;background:var(--q-color);border-radius:3px 3px 0 0;min-height:2px;transition:height .5s;opacity:.7}
+.dist-col:hover{opacity:1}
 .share-link-box{background:var(--bg2);border:.5px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;word-break:break-all;color:var(--text2);margin:.75rem 0}
 .field-hint{font-size:12px;color:var(--text2);line-height:1.6;background:var(--bg2);border-radius:8px;padding:8px 12px}
+:root { --q-color: #6c63ff; }
+/* Barre progression répondant */
+.q-progress-bar{background:var(--bg3);border-radius:99px;height:6px;margin:0 0 1.5rem;overflow:hidden}
+.q-progress-fill{height:6px;border-radius:99px;background:var(--q-color);transition:width .4s ease}
+.q-progress-label{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text3);margin-bottom:.4rem}
+.q-card.q-answered{border-left:3px solid var(--green-border)}
+.q-card.q-current{border-left:3px solid var(--q-color);box-shadow:0 0 0 2px color-mix(in srgb,var(--q-color) 15%,transparent)}
+.type-changer{font-size:11px;font-weight:600;padding:3px 6px;border-radius:6px;border:.5px solid var(--border2);background:var(--bg2);color:var(--text2);cursor:pointer;max-width:130px}
+.type-changer:hover{background:var(--bg3)}
+.q-img-preview{max-width:100%;max-height:200px;border-radius:8px;margin:.5rem 0;border:.5px solid var(--border);display:block}
+.q-img-zone{background:var(--bg2);border:.5px dashed var(--border2);border-radius:8px;padding:.75rem;margin-top:.5rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.resp-q-img{max-width:100%;max-height:300px;border-radius:10px;margin-bottom:.75rem;display:block;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+.q-color-btn { background: var(--q-color) !important; }
 </style>
 </head>
 <body>
@@ -412,6 +435,8 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
   duration_unit text default 'minutes',
   start_at timestamptz,
   end_at timestamptz,
+  color text default '#6c63ff',
+  logo_url text,
   emailjs_service text,
   emailjs_template text,
   emailjs_key text,
@@ -636,6 +661,29 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     </div>
     <div class="fgroup"><label class="flabel">Description / consignes</label><textarea id="q-desc" rows="2" placeholder="Instructions pour les répondants..."></textarea></div>
     <div class="fgroup"><label class="flabel">Texte de référence (affiché en lecture seule aux répondants)</label><textarea id="q-ref" rows="4" placeholder="Collez ici le texte de l'étude de cas ou le document à analyser..."></textarea></div>
+    <div style="background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:1rem;margin-bottom:1rem">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:.75rem">&#127912; Identité visuelle <span style="font-weight:400;color:var(--text3)">(optionnel)</span></div>
+      <div class="frow3">
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Couleur principale</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="color" id="q-color" value="#6c63ff" style="width:44px;height:36px;border:none;border-radius:6px;cursor:pointer;padding:2px">
+            <input type="text" id="q-color-hex" value="#6c63ff" placeholder="#6c63ff" style="flex:1;font-size:12px" oninput="syncColor(this.value)">
+          </div>
+        </div>
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Logo (URL ou upload)</label>
+          <input type="text" id="q-logo-url" placeholder="https://... ou laissez vide">
+        </div>
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Logo depuis fichier</label>
+          <input type="file" id="q-logo-file" accept="image/*" onchange="handleLogoUpload(this)" style="font-size:11px">
+        </div>
+      </div>
+      <div id="q-logo-preview" style="margin-top:.75rem;display:none">
+        <img id="q-logo-img" style="max-height:60px;max-width:200px;border-radius:6px;border:.5px solid var(--border)">
+      </div>
+    </div>
     <div style="background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:1rem;margin-bottom:1rem">
       <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:.75rem">&#128197; Planification de l&#39;évaluation <span style="font-weight:400;color:var(--text3)">(optionnel — laissez vide pour accès permanent)</span></div>
       <div class="frow2">
@@ -935,6 +983,7 @@ async function renderQuestionnaires(){
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-xs" onclick="shareQ(\'${q.id}\',\'${q.code}\')" title="Partager">🔗</button>
         <button class="btn btn-xs" onclick="previewQ(\'${q.id}\')" title="Aperçu">👁️</button>
+        <button class="btn btn-xs" onclick="showQStats(\'${q.id}\',\'${esc(q.title)}\')" title="Statistiques">&#128202;</button>
         <button class="btn btn-xs" onclick="duplicateQ(\'${q.id}\')" title="Dupliquer">⧉</button>
         <button class="btn btn-xs" onclick="editQ(\'${q.id}\')" title="Modifier">✏️</button>
         <button class="btn btn-xs btn-danger" onclick="deleteQ(\'${q.id}\')" title="Supprimer">🗑</button>
@@ -1020,6 +1069,141 @@ function previewQ(id){
 }
 
 
+async function showQStats(qid, qtitle){
+  navigate('questionnaires');
+  const contentEl=document.getElementById('content');
+  contentEl.innerHTML='<div class="card"><div style="color:var(--text3);font-size:13px">&#128202; Chargement des statistiques...</div></div>';
+  document.getElementById('tb-title').textContent='Statistiques — '+qtitle;
+  document.getElementById('tb-actions').innerHTML=`<button class="btn btn-sm" onclick="renderQuestionnaires()">&#8592; Retour</button>`;
+
+  const [{data:q},{data:rs}]=await Promise.all([
+    SB.from('questionnaires').select('*').eq('id',qid).single(),
+    SB.from('responses').select('*').eq('questionnaire_id',qid).order('created_at',{ascending:false})
+  ]);
+  if(!q||!rs){contentEl.innerHTML='<div class="card">Erreur de chargement.</div>';return;}
+
+  const total=rs.length;
+  const graded=rs.filter(r=>r.graded&&r.score_pct!=null);
+  const avgPct=graded.length?Math.round(graded.reduce((a,r)=>a+r.score_pct,0)/graded.length):null;
+  const maxScore=graded.length?Math.max(...graded.map(r=>r.score_pct)):null;
+  const minScore=graded.length?Math.min(...graded.map(r=>r.score_pct)):null;
+  const passing=graded.filter(r=>r.score_pct>=50).length;
+
+  // Distribution scores 0-10,10-20,...90-100
+  const distBuckets=Array(10).fill(0);
+  graded.forEach(r=>{const b=Math.min(9,Math.floor(r.score_pct/10));distBuckets[b]++;});
+  const maxBucket=Math.max(...distBuckets,1);
+
+  // Stats par question
+  const qStats=(q.questions||[]).map(qq=>{
+    let correct=0,wrong=0,answered=0;
+    rs.forEach(r=>{
+      const ans=(r.answers||{})[qq.id];
+      if(ans===undefined||ans===null) return;
+      answered++;
+      if(qq.correctAnswer!==null&&qq.correctAnswer!==undefined){
+        if(qq.type==='qcm'){const ca=qq.options&&qq.options[qq.correctAnswer];if(ans===ca)correct++;else wrong++;}
+        else if(qq.type==='yesno'){if(ans===qq.correctAnswer)correct++;else wrong++;}
+        else answered--;// pas d'auto-correction
+      }
+    });
+    const rate=answered>0?Math.round(correct/answered*100):null;
+    return{label:qq.label||qq.type,type:qq.type,answered,correct,wrong,rate,total:rs.length};
+  });
+
+  let html='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">';
+  const cards=[
+    ['&#128203;','Soumissions',total,''],
+    ['&#128200;','Note moyenne',avgPct!=null?(avgPct+'%'):'—',''],
+    ['&#9989;','Taux de réussite',graded.length?(Math.round(passing/graded.length*100)+'%'):'—','(≥50%)'],
+    ['&#128279;','Corrigées',graded.length+' / '+total,''],
+  ];
+  cards.forEach(([ic,lbl,val,sub])=>{
+    html+='<div class="stats-q-card"><div style="font-size:20px;margin-bottom:.5rem">'+ic+'</div>';
+    html+='<div class="stat-big">'+val+'</div><div class="stat-sub-lbl">'+lbl+(sub?' '+sub:'')+'</div></div>';
+  });
+  html+='</div>';
+
+  if(graded.length>0){
+    // Distribution des scores
+    html+='<div class="stats-q-card"><div style="font-size:13px;font-weight:600;margin-bottom:1rem">Distribution des scores</div>';
+    html+='<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:3px;height:100px;padding:0 4px">';
+    distBuckets.forEach((count,i)=>{
+      const h=maxBucket>0?Math.round(count/maxBucket*90):2;
+      const pct=i*10+'-'+(i*10+10)+'%';
+      const col=i<4?'#ef4444':i<6?'#f59e0b':'#22c55e';
+      html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">';
+      html+='<div style="font-size:10px;color:var(--text3)">'+count+'</div>';
+      html+='<div style="background:'+col+';width:100%;height:'+h+'px;border-radius:4px 4px 0 0;min-height:2px;opacity:.8" title="'+pct+'"></div>';
+      html+='<div style="font-size:9px;color:var(--text3)">'+i*10+'%</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+    html+='<div style="display:flex;gap:1rem;margin-top:.75rem;font-size:12px;color:var(--text2)">';
+    html+='<span>&#128200; Min: '+minScore+'%</span>';
+    html+='<span>&#128201; Max: '+maxScore+'%</span>';
+    html+='<span>&#127919; Moy: '+(avgPct||'—')+'%</span>';
+    html+='</div></div>';
+  }
+
+  // Stats par question
+  const autoQs=qStats.filter(s=>s.rate!==null);
+  if(autoQs.length>0){
+    html+='<div class="stats-q-card"><div style="font-size:13px;font-weight:600;margin-bottom:1rem">Taux de réussite par question (auto-corrigées)</div>';
+    // Trier par taux croissant (plus difficiles en premier)
+    const sorted=[...autoQs].sort((a,b)=>(a.rate||0)-(b.rate||0));
+    sorted.forEach(s=>{
+      const col=s.rate<40?'#ef4444':s.rate<70?'#f59e0b':'#22c55e';
+      html+='<div class="bar-chart-row">';
+      html+='<div class="bar-chart-lbl" title="'+esc(s.label)+'">'+esc(s.label.slice(0,18))+'</div>';
+      html+='<div style="flex:1;background:var(--bg3);border-radius:4px;height:18px;overflow:hidden">';
+      html+='<div style="height:18px;width:'+(s.rate||0)+'%;background:'+col+';border-radius:4px;transition:width .5s"></div></div>';
+      html+='<div class="bar-chart-val" style="color:'+col+'">'+s.rate+'%</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+
+  // Question la plus échouée
+  if(autoQs.length>0){
+    const hardest=autoQs.reduce((a,b)=>(a.rate||100)<(b.rate||100)?a:b);
+    const easiest=autoQs.reduce((a,b)=>(a.rate||0)>(b.rate||0)?a:b);
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">';
+    html+='<div class="stats-q-card" style="border-left:4px solid #ef4444">';
+    html+='<div style="font-size:11px;font-weight:600;color:#ef4444;margin-bottom:.25rem">&#128308; Plus difficile ('+hardest.rate+'%)</div>';
+    html+='<div style="font-size:13px">'+esc(hardest.label)+'</div>';
+    html+='<div style="font-size:11px;color:var(--text3)">'+hardest.wrong+' erreur'+(hardest.wrong>1?'s':'')+' sur '+hardest.answered+'</div></div>';
+    html+='<div class="stats-q-card" style="border-left:4px solid #22c55e">';
+    html+='<div style="font-size:11px;font-weight:600;color:#22c55e;margin-bottom:.25rem">&#128994; Plus facile ('+easiest.rate+'%)</div>';
+    html+='<div style="font-size:13px">'+esc(easiest.label)+'</div>';
+    html+='<div style="font-size:11px;color:var(--text3)">'+easiest.correct+' bonne'+(easiest.correct>1?'s':'')+' réponse'+(easiest.correct>1?'s':'')+' sur '+easiest.answered+'</div></div>';
+    html+='</div>';
+  }
+
+  // Liste des réponses récentes
+  html+='<div class="stats-q-card"><div style="font-size:13px;font-weight:600;margin-bottom:1rem">Dernières soumissions</div>';
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>';
+  html+='<th style="text-align:left;padding:5px 8px;border-bottom:.5px solid var(--border);color:var(--text3)">Répondant</th>';
+  html+='<th style="text-align:left;padding:5px 8px;border-bottom:.5px solid var(--border);color:var(--text3)">Date</th>';
+  html+='<th style="text-align:center;padding:5px 8px;border-bottom:.5px solid var(--border);color:var(--text3)">Note</th>';
+  html+='<th style="text-align:center;padding:5px 8px;border-bottom:.5px solid var(--border);color:var(--text3)">Statut</th>';
+  html+='</tr></thead><tbody>';
+  rs.slice(0,10).forEach(r=>{
+    const mention=r.score_pct!=null?getMention(r.score_pct):null;
+    html+='<tr>';
+    html+='<td style="padding:6px 8px;border-bottom:.5px solid var(--border)">'+esc(r.respondent_name)+'</td>';
+    html+='<td style="padding:6px 8px;border-bottom:.5px solid var(--border);color:var(--text3)">'+fmt(r.created_at)+'</td>';
+    html+='<td style="padding:6px 8px;border-bottom:.5px solid var(--border);text-align:center;font-weight:600">'+(r.score_pct!=null?r.score_pct+'%':'—')+'</td>';
+    html+='<td style="padding:6px 8px;border-bottom:.5px solid var(--border);text-align:center">';
+    if(r.graded&&mention) html+='<span style="background:'+mention.bg+';color:'+mention.fg+';font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px">'+mention.txt+'</span>';
+    else html+='<span style="background:var(--amber-bg);color:var(--amber-text);font-size:10px;padding:2px 8px;border-radius:99px">En attente</span>';
+    html+='</td></tr>';
+  });
+  html+='</tbody></table></div>';
+
+  contentEl.innerHTML=html;
+}
+
 async function toggleActive(id,val){await SB.from('questionnaires').update({active:val}).eq('id',id);renderQuestionnaires();}
 async function deleteQ(id){
   if(!confirm('Supprimer ce questionnaire et toutes ses réponses ?'))return;
@@ -1053,6 +1237,10 @@ function openQModal(qid){
   document.getElementById('q-duration-unit').value='minutes';
   document.getElementById('q-start-at').value='';
   document.getElementById('q-end-at').value='';
+  document.getElementById('q-color').value='#6c63ff';
+  document.getElementById('q-color-hex').value='#6c63ff';
+  document.getElementById('q-logo-url').value='';
+  document.getElementById('q-logo-preview').style.display='none';
   document.getElementById('q-type').value='mixed';
   document.getElementById('q-builder').innerHTML='';
   if(!qid){updateBEmpty();openModal('modal-q');return;}
@@ -1069,6 +1257,13 @@ function openQModal(qid){
       document.getElementById('q-duration-unit').value=q.duration_unit||'minutes';
       document.getElementById('q-start-at').value=q.start_at?q.start_at.slice(0,16):'';
       document.getElementById('q-end-at').value=q.end_at?q.end_at.slice(0,16):'';
+      document.getElementById('q-color').value=q.color||'#6c63ff';
+      document.getElementById('q-color-hex').value=q.color||'#6c63ff';
+      document.getElementById('q-logo-url').value=q.logo_url||'';
+      if(q.logo_url){
+        document.getElementById('q-logo-img').src=q.logo_url;
+        document.getElementById('q-logo-preview').style.display='block';
+      }
       document.getElementById('q-emailjs-service').value=q.emailjs_service||'';
       document.getElementById('q-emailjs-template').value=q.emailjs_template||'';
       document.getElementById('q-emailjs-key').value=q.emailjs_key||'';
@@ -1103,7 +1298,9 @@ function renderBuild(){
       <div class="q-bhdr">
         <span class="drag-handle" title="Glisser pour réorganiser">⠿</span>
         <div class="q-num">${i+1}</div>
-        <span class="badge ${BTBC[q.type]||'bg-gray'}">${BTL[q.type]||q.type}</span>
+        <select class="type-changer" onchange="changeQType('${q.id}',this.value)" title="Changer le type de question">
+          ${Object.entries(BTL).map(([k,v])=>`<option value="${k}" ${q.type===k?'selected':''}>${v}</option>`).join('')}
+        </select>
         <div class="q-bactions">
           ${i>0?`<button class="btn-icon" onclick="mvQ('${q.id}',-1)" title="Monter">↑</button>`:''}
           ${i<bQs.length-1?`<button class="btn-icon" onclick="mvQ('${q.id}',1)" title="Descendre">↓</button>`:''}
@@ -1111,6 +1308,18 @@ function renderBuild(){
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:.5rem"><input type="text" placeholder="Libellé *" value="${esc(q.label||'')}" oninput="uQ('${q.id}','label',this.value)" style="font-weight:500;flex:1"><label style="font-size:11px;color:var(--text2);display:flex;align-items:center;gap:4px;flex-shrink:0">Pts:<input type="number" min="0" max="100" value="${q.points||1}" oninput="uQ('${q.id}','points',+this.value)" style="width:52px;padding:5px 6px;font-size:12px;margin-left:4px"></label></div>
+      <div class="q-img-zone">
+        <span style="font-size:11px;color:var(--text3)">&#128247;</span>
+        <input type="text" placeholder="URL image (optionnel)" value="${esc(q.image_url||'')}"
+          oninput="uQ('${q.id}','image_url',this.value)" id="qimg-${q.id}"
+          style="flex:1;font-size:11px;min-width:0">
+        <label style="cursor:pointer" class="btn btn-xs">&#128190;
+          <input type="file" accept="image/*" style="display:none"
+            onchange="uploadQImg('${q.id}',this)">
+        </label>
+        ${q.image_url?`<button class="btn-icon" onclick="uQ('${q.id}','image_url','');renderBuild()" title="Supprimer image">✕</button>`:''}
+      </div>
+      ${q.image_url?`<img src="${esc(q.image_url)}" style="max-width:100%;max-height:160px;border-radius:8px;margin:.25rem 0;object-fit:cover">`:''}
       ${buildBody(q)}
       ${buildCorrect(q)}
       <label style="display:flex;align-items:center;gap:8px;margin-top:.5rem;font-size:12px;color:var(--text2);cursor:pointer"><input type="checkbox" ${q.required?'checked':''} onchange="uQ('${q.id}','required',this.checked)"> Obligatoire</label>
@@ -1395,6 +1604,57 @@ function onDrop(e, targetId) {
   renderBuild();
 }
 
+function uploadQImg(qid, input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const url=e.target.result;
+    uQ(qid,'image_url',url);
+    updateQImgPreview(qid,url);
+    const urlEl=document.getElementById('qimg-url-'+qid);
+    if(urlEl) urlEl.value='(image uploadée)';
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateQImgPreview(qid, url){
+  const img=document.getElementById('qimgprev-'+qid);
+  if(!img) return;
+  if(url){
+    img.src=url;
+    img.style.display='block';
+  } else {
+    img.src='';
+    img.style.display='none';
+  }
+}
+
+function changeQType(qid, newType){
+  const q=bQs.find(x=>x.id===qid);
+  if(!q||q.type===newType) return;
+  const oldType=q.type;
+  q.type=newType;
+  // Migrer les données selon le changement de type
+  if((oldType==='qcm'||oldType==='checkbox')&&(newType==='qcm'||newType==='checkbox')){
+    // Garder les options existantes
+    if(newType==='qcm') q.correctAnswer=typeof q.correctAnswer==='number'?q.correctAnswer:0;
+    if(newType==='checkbox') q.correctAnswer=Array.isArray(q.correctAnswer)?q.correctAnswer:[];
+  } else {
+    // Réinitialiser selon le nouveau type
+    delete q.options; delete q.correctAnswer; delete q.columns; delete q.rows;
+    delete q.min; delete q.max; delete q.minLabel; delete q.maxLabel;
+    if(newType==='qcm'){q.options=['Option A','Option B','Option C'];q.correctAnswer=0;}
+    else if(newType==='checkbox'){q.options=['Option 1','Option 2','Option 3'];q.correctAnswer=[];}
+    else if(newType==='scale'){q.min=1;q.max=5;q.minLabel='';q.maxLabel='';}
+    else if(newType==='table'){q.columns=['Colonne 1','Colonne 2'];q.rows=[''];q.correctAnswer=null;}
+    else if(newType==='yesno'){q.correctAnswer='Oui';}
+    else if(newType==='text'){q.placeholder='';}
+  }
+  renderBuild();
+  toast('Type modifié : '+BTL[newType],'info');
+}
+
 function onDragEnd(e) {
   dragSrcId = null;
   document.querySelectorAll('.q-block').forEach(b => {
@@ -1504,6 +1764,8 @@ async function saveQuestionnaire(){
     duration_unit:document.getElementById('q-duration-unit').value,
     start_at:document.getElementById('q-start-at').value||null,
     end_at:document.getElementById('q-end-at').value||null,
+    color:document.getElementById('q-color').value||'#6c63ff',
+    logo_url:document.getElementById('q-logo-url').value.trim()||null,
     emailjs_service:document.getElementById('q-emailjs-service').value.trim(),
     emailjs_template:document.getElementById('q-emailjs-template').value.trim(),
     emailjs_key:document.getElementById('q-emailjs-key').value.trim()
@@ -2041,7 +2303,7 @@ const selQCM = (qid, oi, val) => {
     const d = document.getElementById('dot-' + qid + '-' + i);
     if (d) d.style.background = i === oi ? 'var(--text)' : '';
   });
-  if(curQ) saveProgress(curQ.id);
+  if(curQ){ saveProgress(curQ.id); updateProgress(); }
 };
 
 const togChk = (qid, oi, val) => {
@@ -2052,7 +2314,7 @@ const togChk = (qid, oi, val) => {
   const sq = document.getElementById('sq-' + qid + '-' + oi);
   if (el) el.className = 'r-opt' + (rAns[qid].includes(val) ? ' selected' : '');
   if (sq) sq.style.background = rAns[qid].includes(val) ? 'var(--text)' : '';
-  if(curQ) saveProgress(curQ.id);
+  if(curQ){ saveProgress(curQ.id); updateProgress(); }
 };
 
 const selYN = (qid, val) => {
@@ -2065,7 +2327,7 @@ const selYN = (qid, val) => {
       b.style.borderColor = v === val ? 'var(--text)' : '';
     }
   });
-  if(curQ) saveProgress(curQ.id);
+  if(curQ){ saveProgress(curQ.id); updateProgress(); }
 };
 
 const selSc = (qid, val) => {
@@ -2074,7 +2336,7 @@ const selSc = (qid, val) => {
     const n = +el.id.split('-').pop();
     el.className = 'scale-btn' + (n === val ? ' selected' : '');
   });
-  if(curQ) saveProgress(curQ.id);
+  if(curQ){ saveProgress(curQ.id); updateProgress(); }
 };
 
 function uTA(qid, ri, kci, val) {
@@ -2116,13 +2378,19 @@ function _renderRContent(q,qs,isGroup,requireSig,refHtml,descHtml){
   el.innerHTML='<div style="text-align:center;margin-bottom:1.5rem"><div style="font-size:24px;font-weight:800;color:#1a1a2e;margin-bottom:.25rem">'+esc(q.title)+'</div><div style="font-size:13px;color:var(--text3)">'+qs.length+' question'+(qs.length>1?'s':'')+durStr+' &bull; Les champs * sont obligatoires</div></div>'+
     descHtml+refHtml+
     '<div class="info-card"><div class="sec-title">&#128100; '+(isGroup?'Informations du groupe':'Vos informations')+'</div>'+membersHtml+'</div>'+
+    '<div id="q-progress-wrap" style="position:sticky;top:0;z-index:10;background:var(--bg2);padding:.75rem 1rem .5rem;margin:0 -1rem 1rem;border-bottom:.5px solid var(--border)">'+
+    '<div class="q-progress-label"><span id="q-progress-txt">Question 1 / '+qs.length+'</span><span id="q-progress-pct">0%</span></div>'+
+    '<div class="q-progress-bar"><div class="q-progress-fill" id="q-progress-fill" style="width:0%"></div></div>'+
+    '</div>'+
     qs.map((qq,i)=>renderRQ(qq,i)).join('')+
     sigHtml+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2rem;padding-bottom:2rem"><button class="btn" onclick="goHome()" style="border-radius:10px">&#8592; Retour</button><button class="submit-btn-main" id="submit-btn" onclick="submitR()">&#10003; Envoyer mes réponses</button></div>';
   if(requireSig) initSigCanvas();
+  applyQuestionnaireBranding(q);
   // Restaurer la progression sauvegardée
   setTimeout(()=>{
     restoreProgress(curQ.id);
+    setTimeout(updateProgress,300);
     // Sauvegarde auto toutes les 15 secondes
     clearInterval(window._autoSave);
     window._autoSave = setInterval(()=>saveProgress(curQ.id), 15000);
@@ -2226,6 +2494,8 @@ function getSigData(){
 function renderRQ(qq,i){
   const req=qq.required?'<span class="q-req">*</span>':'';
   let body='';
+  // Image si présente
+  const imgHtml=qq.image_url?`<img src="${esc(qq.image_url)}" class="resp-q-img" alt="Illustration">`:'';
   if(qq.type==='text')body=`<textarea id="ans-${qq.id}" rows="4" placeholder="${esc(qq.placeholder||'Votre réponse...')}" oninput="rAns['${qq.id}']=this.value;saveProgress(curQ.id)" style="border-radius:10px"></textarea>`;
   else if(qq.type==='qcm')body=(qq.options||[]).map((o,oi)=>`<div class="r-opt" id="ro-${qq.id}-${oi}" onclick="selQCM('${qq.id}',${oi},'${esc(o)}')"><div class="opt-dot" id="dot-${qq.id}-${oi}" style="margin-top:1px;flex-shrink:0"></div><span>${esc(o)}</span></div>`).join('');
   else if(qq.type==='checkbox'){body=(qq.options||[]).map((o,oi)=>`<div class="r-opt" id="co-${qq.id}-${oi}" onclick="togChk('${qq.id}',${oi},'${esc(o)}')"><div class="opt-sq" id="sq-${qq.id}-${oi}" style="margin-top:1px;flex-shrink:0"></div><span>${esc(o)}</span></div>`).join('');rAns[qq.id]=[];}
@@ -2239,7 +2509,7 @@ function renderRQ(qq,i){
     <tbody id="tbl-${qq.id}">${rows.map((r,ri)=>`<tr><td class="${r?'tq-phrase':''}" style="${r?'':'padding:0'}">${r?`<span>${esc(r)}</span>`:ta(ri,-1,true)}</td>${cols.map((_,ci)=>`<td style="padding:0;border:.5px solid var(--border2)">${ta(ri,ci,false)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     <button class="btn btn-xs" style="margin-top:6px" onclick="addTRow('${qq.id}',${cols.length})">+ Ligne</button>`;
   }
-  return`<div class="q-card" id="qcard-${qq.id}"><div class="q-lbl">${i+1}. ${esc(qq.label||'Question')}${req}</div>${body}</div>`;
+  return`<div class="q-card" id="qcard-${qq.id}"><div class="q-lbl">${i+1}. ${esc(qq.label||'Question')}${req}</div>${imgHtml}${body}</div>`;
 }
 
 
@@ -3117,6 +3387,7 @@ function goHome(){
     saveProgress(curQ.id);
   }
   clearInterval(window._autoSave);
+  resetQuestionnaireBranding();
   document.getElementById('respondent-app').style.display='none';
   document.getElementById('my-results-app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
@@ -3968,6 +4239,92 @@ function startEndAtCountdown(q){
       }
     }
   }, 1000);
+}
+
+// ─── BARRE DE PROGRESSION ────────────────────────────
+function updateProgress(){
+  if(!curQ||!curQ.questions) return;
+  const total=curQ.questions.length;
+  let answered=0;
+  curQ.questions.forEach(qq=>{
+    const ans=rAns[qq.id];
+    if(qq.type==='checkbox') { if(Array.isArray(ans)&&ans.length>0) answered++; }
+    else if(qq.type==='table') { if(ans&&ans.rows&&ans.rows.some(r=>r.phrase||(r.cols&&r.cols.some(c=>c)))) answered++; }
+    else if(ans!==undefined&&ans!==null&&ans!=='') answered++;
+  });
+  const pct=total>0?Math.round(answered/total*100):0;
+  const fillEl=document.getElementById('q-progress-fill');
+  const txtEl=document.getElementById('q-progress-txt');
+  const pctEl=document.getElementById('q-progress-pct');
+  if(fillEl) fillEl.style.width=pct+'%';
+  if(txtEl) txtEl.textContent=answered+' / '+total+' question'+(total>1?'s':'')+' répondue'+(answered>1?'s':'');
+  if(pctEl) pctEl.textContent=pct+'%';
+  // Marquer les questions répondues
+  curQ.questions.forEach(qq=>{
+    const card=document.getElementById('qcard-'+qq.id);
+    if(!card) return;
+    const ans=rAns[qq.id];
+    const done=(qq.type==='checkbox'?(Array.isArray(ans)&&ans.length>0):(ans!==undefined&&ans!==null&&ans!==''));
+    card.classList.toggle('q-answered', done);
+  });
+}
+
+// ─── PERSONNALISATION VISUELLE ───────────────────────
+function syncColor(hex){
+  if(/^#[0-9a-fA-F]{6}$/.test(hex)){
+    const el=document.getElementById('q-color');
+    if(el) el.value=hex;
+  }
+}
+
+// Sync bidirectionnel couleur ↔ hex
+document.addEventListener('DOMContentLoaded',()=>{
+  const colorPicker=document.getElementById('q-color');
+  if(colorPicker){
+    colorPicker.addEventListener('input',function(){
+      const hexEl=document.getElementById('q-color-hex');
+      if(hexEl) hexEl.value=this.value;
+      const previewEl=document.getElementById('logo-preview-color');
+      if(previewEl) previewEl.style.background=this.value;
+    });
+  }
+});
+
+function handleLogoUpload(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const url=e.target.result;
+    const urlEl=document.getElementById('q-logo-url');
+    if(urlEl) urlEl.value=url;
+    const img=document.getElementById('q-logo-img');
+    const prev=document.getElementById('q-logo-preview');
+    if(img) img.src=url;
+    if(prev) prev.style.display='block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function applyQuestionnaireBranding(q){
+  if(!q) return;
+  const color=q.color||'#6c63ff';
+  const root=document.documentElement;
+  root.style.setProperty('--q-color',color);
+  // Ajuster header répondant
+  const header=document.getElementById('respondent-app')?.querySelector('.r-header');
+  if(header) header.style.background='linear-gradient(90deg,'+color+'dd,'+color+'aa)';
+  // Logo dans le header
+  const titleEl=document.getElementById('r-title');
+  if(q.logo_url&&titleEl){
+    titleEl.innerHTML='<img src="'+q.logo_url+'" style="max-height:32px;max-width:120px;object-fit:contain;vertical-align:middle;margin-right:8px">'+esc(q.title);
+  }
+}
+
+function resetQuestionnaireBranding(){
+  document.documentElement.style.removeProperty('--q-color');
+  const header=document.getElementById('respondent-app')?.querySelector('.r-header');
+  if(header) header.style.background='';
 }
 
 // ─── DARK MODE ────────────────────────────────────── ────────────────────────────────────────
