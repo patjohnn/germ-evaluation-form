@@ -2209,11 +2209,20 @@ function restoreProgress(qid){
           });
         } else if(qq.type==='table'&&val&&val.rows){
           val.rows.forEach((row,ri)=>{
-            const phraseEl=document.querySelector('#tbl-'+qq.id+' tr:nth-child('+(ri+1)+') textarea:first-child');
-            if(phraseEl&&row.phrase)phraseEl.value=row.phrase;
+            const tr=document.querySelector('#tbl-'+qq.id+' tr:nth-child('+(ri+1)+')');
+            if(!tr)return;
+            // Phrase : ne restaurer QUE si la ligne n'est pas préremplie par l'admin
+            const adminPhrase=(qq.rows&&qq.rows[ri])||'';
+            if(!adminPhrase&&row.phrase){
+              // Ligne saisie librement : la 1ère td contient le textarea de phrase
+              const phraseTd=tr.querySelector('td:first-child textarea');
+              if(phraseTd)phraseTd.value=row.phrase;
+            }
+            // Colonnes de réponse : toujours dans les td après la 1ère
             if(row.cols)row.cols.forEach((cv,ci)=>{
-              const colEl=document.querySelector('#tbl-'+qq.id+' tr:nth-child('+(ri+1)+') td:nth-child('+(ci+2)+') textarea');
-              if(colEl&&cv)colEl.value=cv;
+              // nth-child(ci+2) car la 1ère td est la phrase
+              const colTd=tr.querySelector('td:nth-child('+(ci+2)+') textarea');
+              if(colTd&&cv)colTd.value=cv;
             });
           });
         }
