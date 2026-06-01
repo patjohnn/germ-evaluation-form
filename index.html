@@ -319,6 +319,33 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
 .step-indicator{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:1.5rem}
 .step-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3);transition:all .3s}
 .step-dot.active{background:#fff;width:24px;border-radius:4px}
+
+/* ── NOTIFICATIONS REALTIME ── */
+.notif-bell{position:relative;cursor:pointer;padding:6px;border-radius:8px;background:none;border:none;font-size:18px;color:var(--text2);transition:all .2s}
+.notif-bell:hover{background:var(--bg2);color:var(--text)}
+.notif-dot{position:absolute;top:2px;right:2px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid var(--bg);display:none}
+.notif-dot.active{display:block;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.3);opacity:.8}}
+.notif-badge{position:absolute;top:0;right:0;min-width:18px;height:18px;background:#ef4444;color:#fff;border-radius:99px;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--bg)}
+.notif-badge.show{display:flex}
+.notif-panel{position:fixed;top:52px;right:1rem;width:340px;max-height:480px;background:var(--bg);border:.5px solid var(--border2);border-radius:var(--rl);box-shadow:0 8px 32px rgba(0,0,0,.15);z-index:300;display:none;flex-direction:column;overflow:hidden}
+.notif-panel.open{display:flex}
+.notif-panel-header{padding:.875rem 1rem;border-bottom:.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.notif-panel-title{font-size:13px;font-weight:600}
+.notif-list{overflow-y:auto;max-height:380px}
+.notif-item{padding:.875rem 1rem;border-bottom:.5px solid var(--border);cursor:pointer;transition:background .1s}
+.notif-item:hover{background:var(--bg2)}
+.notif-item.unread{background:var(--blue-bg)}
+.notif-item.unread:hover{background:var(--blue-bg);filter:brightness(.97)}
+.notif-name{font-size:13px;font-weight:500;color:var(--text)}
+.notif-meta{font-size:11px;color:var(--text3);margin-top:2px}
+.notif-q{font-size:12px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.notif-empty{text-align:center;padding:2rem;font-size:13px;color:var(--text3)}
+.realtime-indicator{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--green-text);background:var(--green-bg);padding:3px 8px;border-radius:99px}
+.realtime-dot{width:6px;height:6px;background:var(--green-text);border-radius:50%;animation:pulse-dot 2s infinite}
+.notif-pop{position:fixed;bottom:5rem;right:1.5rem;background:var(--bg);border:.5px solid var(--border2);border-radius:var(--rl);padding:1rem 1.25rem;box-shadow:0 8px 28px rgba(0,0,0,.15);z-index:9998;max-width:300px;display:none;animation:slide-in .3s ease}
+@keyframes slide-in{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+.notif-pop.show{display:block}
 </style>
 </head>
 <body>
@@ -460,7 +487,21 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       </div>
     </div>
     <div id="main">
-      <div id="topbar"><div class="tb-title" id="tb-title">Tableau de bord</div><div class="tb-actions" id="tb-actions"></div></div>
+      <div id="topbar">
+        <div class="tb-title" id="tb-title">Tableau de bord</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="realtime-indicator" id="rt-indicator" style="display:none">
+            <div class="realtime-dot"></div> Temps réel
+          </div>
+          <div style="position:relative">
+            <button class="notif-bell" onclick="toggleNotifPanel()" id="notif-bell" title="Notifications">
+              🔔
+              <span class="notif-badge" id="notif-badge"></span>
+            </button>
+          </div>
+          <div class="tb-actions" id="tb-actions"></div>
+        </div>
+      </div>
       <div id="content"></div>
     </div>
   </div>
@@ -491,6 +532,23 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
   </div>
   <div style="max-width:740px;margin:0 auto;padding:1.75rem 1rem 4rem" id="my-results-content"></div>
 </div>
+
+<!-- NOTIFICATION PANEL -->
+<div class="notif-panel" id="notif-panel">
+  <div class="notif-panel-header">
+    <div class="notif-panel-title">Notifications</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-xs" onclick="markAllRead()">Tout lire</button>
+      <button onclick="toggleNotifPanel()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text3)">✕</button>
+    </div>
+  </div>
+  <div class="notif-list" id="notif-list">
+    <div class="notif-empty">Aucune notification</div>
+  </div>
+</div>
+
+<!-- NOTIFICATION POPUP -->
+<div class="notif-pop" id="notif-pop"></div>
 
 <div class="modal-overlay" id="modal-q">
   <div class="modal modal-xl">
@@ -689,9 +747,17 @@ function doLogin(){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('admin-app').style.display='block';
     navigate('dashboard');
+    loadSavedNotifs();
+    initRealtime();
   }else{toast('Mot de passe incorrect.','error');document.getElementById('login-pwd').value='';}
 }
-function doLogout(){document.getElementById('admin-app').style.display='none';document.getElementById('login-screen').style.display='flex';document.getElementById('login-pwd').value='';}
+function doLogout(){
+  if(realtimeChannel) { SB.removeChannel(realtimeChannel); realtimeChannel=null; }
+  notifications=[]; unreadCount=0;
+  document.getElementById('admin-app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-pwd').value='';
+}
 function savePwd(){
   const np=document.getElementById('new-pwd').value, cp=document.getElementById('confirm-pwd').value;
   if(!np||np.length<6){toast('Min. 6 caractères.','error');return;}
@@ -707,9 +773,20 @@ function navigate(view){
   updateDarkBtn(isDark);
 }
 async function updateBadges(){
-  const[{data:qs},{data:rs}]=await Promise.all([SB.from('questionnaires').select('id'),SB.from('responses').select('id')]);
+  const[{data:qs},{data:rs}]=await Promise.all([
+    SB.from('questionnaires').select('id'),
+    SB.from('responses').select('id,graded')
+  ]);
   document.getElementById('nb-q').textContent=(qs||[]).length;
-  document.getElementById('nb-r').textContent=(rs||[]).length;
+  const totalR=(rs||[]).length;
+  const pendingR=(rs||[]).filter(r=>!r.graded).length;
+  const nbEl=document.getElementById('nb-r');
+  if(nbEl){
+    nbEl.textContent=totalR;
+    nbEl.style.background=pendingR>0?'#ef4444':'';
+    nbEl.style.color=pendingR>0?'#fff':'';
+    nbEl.title=pendingR>0?pendingR+' en attente de correction':'';
+  }
 }
 
 // ─── TYPE MAPS ────────────────────────────────────────
@@ -2482,6 +2559,154 @@ function showRespErr(msg){
   document.getElementById('r-title').textContent='Questionnaire';
   const el=document.getElementById('r-content');
   el.innerHTML='<div style="text-align:center;padding:4rem 2rem"><div style="font-size:48px;margin-bottom:1rem">&#9888;</div><div style="font-size:18px;font-weight:600;margin-bottom:.5rem">Indisponible</div><div style="font-size:14px;color:#5f5e5a">'+msg+'</div></div>';
+}
+
+// ─── NOTIFICATIONS REALTIME ──────────────────────────
+let notifications = [];
+let unreadCount = 0;
+let realtimeChannel = null;
+
+function initRealtime() {
+  if (!SB) return;
+  // Supabase Realtime — écouter les nouvelles réponses
+  realtimeChannel = SB
+    .channel('new-responses')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'responses'
+    }, async (payload) => {
+      const r = payload.new;
+      // Récupérer le titre du questionnaire
+      const { data: q } = await SB
+        .from('questionnaires')
+        .select('title')
+        .eq('id', r.questionnaire_id)
+        .single();
+      const notif = {
+        id: r.id,
+        name: r.respondent_name,
+        email: r.respondent_email,
+        qTitle: q ? q.title : 'Questionnaire',
+        qId: r.questionnaire_id,
+        time: new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'}),
+        read: false
+      };
+      addNotification(notif);
+      showNotifPop(notif);
+      // Mettre à jour les badges dans la sidebar
+      updateBadges();
+    })
+    .subscribe((status) => {
+      const indicator = document.getElementById('rt-indicator');
+      if (indicator) {
+        indicator.style.display = status === 'SUBSCRIBED' ? 'flex' : 'none';
+      }
+    });
+}
+
+function addNotification(notif) {
+  notifications.unshift(notif);
+  // Garder max 50 notifications
+  if (notifications.length > 50) notifications.pop();
+  unreadCount++;
+  updateNotifBadge();
+  renderNotifList();
+  // Sauvegarder localement
+  try { localStorage.setItem('ep_notifs', JSON.stringify(notifications.slice(0,20))); } catch(e) {}
+}
+
+function updateNotifBadge() {
+  const badge = document.getElementById('notif-badge');
+  if (!badge) return;
+  if (unreadCount > 0) {
+    badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+    badge.classList.add('show');
+  } else {
+    badge.classList.remove('show');
+  }
+}
+
+function toggleNotifPanel() {
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    renderNotifList();
+  }
+}
+
+// Fermer le panel si on clique ailleurs
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('notif-panel');
+  const bell = document.getElementById('notif-bell');
+  if (panel && bell && !panel.contains(e.target) && !bell.contains(e.target)) {
+    panel.classList.remove('open');
+  }
+});
+
+function renderNotifList() {
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+  if (!notifications.length) {
+    list.innerHTML = '<div class="notif-empty">Aucune notification pour l&#39;instant.<br>Les nouvelles réponses apparaîtront ici.</div>';
+    return;
+  }
+  list.innerHTML = notifications.map(n => {
+    return '<div class="notif-item ' + (n.read ? '' : 'unread') + '" onclick="openFromNotif('' + n.qId + '','' + n.id + '')">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+        '<div class="notif-name">&#128100; ' + esc(n.name) + '</div>' +
+        '<div class="notif-meta">' + n.time + '</div>' +
+      '</div>' +
+      '<div class="notif-q">&#128203; ' + esc(n.qTitle) + '</div>' +
+      '<div class="notif-meta">' + esc(n.email) + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function markAllRead() {
+  notifications.forEach(n => n.read = true);
+  unreadCount = 0;
+  updateNotifBadge();
+  renderNotifList();
+  try { localStorage.setItem('ep_notifs', JSON.stringify(notifications.slice(0,20))); } catch(e) {}
+}
+
+function openFromNotif(qid, rid) {
+  // Marquer comme lu
+  const n = notifications.find(x => x.id === rid);
+  if (n && !n.read) { n.read = true; unreadCount = Math.max(0, unreadCount-1); updateNotifBadge(); }
+  toggleNotifPanel();
+  navigate('responses');
+  // Ouvrir directement le détail après chargement
+  setTimeout(() => viewResponses(qid), 600);
+}
+
+function showNotifPop(notif) {
+  const pop = document.getElementById('notif-pop');
+  if (!pop) return;
+  pop.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">' +
+    '<div style="font-size:13px;font-weight:600;color:var(--text)">&#127381; Nouvelle réponse !</div>' +
+    '<button onclick="this.parentElement.parentElement.classList.remove('show')" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text3);margin-left:.5rem">✕</button>' +
+  '</div>' +
+  '<div style="font-size:13px;color:var(--text)"><strong>' + esc(notif.name) + '</strong> a soumis</div>' +
+  '<div style="font-size:12px;color:var(--text2);margin-top:2px">' + esc(notif.qTitle) + '</div>' +
+  '<button class="btn btn-xs btn-primary" style="margin-top:.75rem;width:100%;justify-content:center" onclick="openFromNotif('' + notif.qId + '','' + notif.id + '')">Voir la réponse →</button>';
+  pop.classList.add('show');
+  clearTimeout(pop._t);
+  pop._t = setTimeout(() => pop.classList.remove('show'), 6000);
+}
+
+function loadSavedNotifs() {
+  try {
+    const saved = localStorage.getItem('ep_notifs');
+    if (saved) {
+      notifications = JSON.parse(saved);
+      unreadCount = notifications.filter(n => !n.read).length;
+      updateNotifBadge();
+      renderNotifList();
+    }
+  } catch(e) {}
 }
 
 // ─── DARK MODE ────────────────────────────────────────
