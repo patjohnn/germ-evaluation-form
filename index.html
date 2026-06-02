@@ -3384,20 +3384,36 @@ function showResultDetail(rIdx,qIdx){
   const q=questionnaires[qIdx];
   if(!r) return;
 
-  const isGraded=r.graded&&r.final_score!=null;
-  const m=isGraded?getMention(r.score_pct):null;
+  // Recalculer le score en temps reel
   const autoScores=q?autoGrade(q,r.answers||{}):{};
+  const manSc2=r.manual_scores||{};
+  const totalPts2=q?calcTotalPts(q):(r.total_points||0);
+  let earned2=0,pending2=0;
+  (q?q.questions:[]).forEach(qq=>{
+    const as=autoScores[qq.id],ms=manSc2[qq.id];
+    if(ms!==undefined&&ms!==null){
+      if(typeof ms==='object'&&!Array.isArray(ms)) earned2+=Object.values(ms).reduce((a,v)=>a+(+v||0),0);
+      else earned2+=+ms;
+    } else if(as!==null&&as!==undefined){ earned2+=+as; }
+    else pending2++;
+  });
+  const calcPct2=totalPts2>0?Math.round(earned2/totalPts2*100):0;
+  const showEarned=pending2===0?earned2:r.final_score;
+  const showTotal=totalPts2||r.total_points||0;
+  const showPct=pending2===0?calcPct2:r.score_pct;
+  const isGraded=(pending2===0&&showEarned!==null)||(r.graded&&r.final_score!=null);
+  const m=isGraded&&showPct!=null?getMention(showPct):null;
 
   let html='<button class="btn btn-sm" onclick="backToMyResults()" style="margin-bottom:1rem">&#8592; Retour</button>';
 
   // ── Score banner ──────────────────────────────────────
   if(isGraded){
-    const w=Math.min(r.score_pct,100);
-    const barCol=r.score_pct>=75?'#22c55e':r.score_pct>=50?'#f59e0b':'#ef4444';
+    const w=Math.min(showPct||0,100);
+    const barCol=(showPct||0)>=75?'#22c55e':(showPct||0)>=50?'#f59e0b':'#ef4444';
     html+='<div class="score-box" style="margin-bottom:1.5rem">';
     html+='<div style="font-size:12px;opacity:.6;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em">Résultat final</div>';
-    html+='<div class="score-num">'+r.final_score+'<span style="font-size:22px;opacity:.4"> / '+r.total_points+'</span></div>';
-    html+='<div style="font-size:14px;opacity:.7;margin-top:.25rem">'+r.score_pct+'%</div>';
+    html+='<div class="score-num">'+showEarned+'<span style="font-size:22px;opacity:.4"> / '+showTotal+'</span></div>';
+    html+='<div style="font-size:14px;opacity:.7;margin-top:.25rem">'+showPct+'%</div>';
     html+='<div style="background:rgba(255,255,255,.15);border-radius:99px;height:8px;margin:1rem auto;max-width:260px">';
     html+='<div style="background:'+barCol+';width:'+w+'%;height:8px;border-radius:99px;transition:width 1s"></div></div>';
     html+='<span style="font-size:13px;font-weight:700;padding:6px 20px;border-radius:99px;display:inline-block;background:'+m.bg+';color:'+m.fg+'">'+m.txt+'</span>';
