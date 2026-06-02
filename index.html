@@ -1469,6 +1469,62 @@ function calcTotalPts(q){
     return s+(qq.points||1);
   },0);
 }
+// ─── COMPARAISON INTELLIGENTE DE RÉPONSES ────────────
+function smartMatch(got, expected, cellPts){
+  // Normaliser : trim, minuscules, espaces multiples
+  const norm = s => s.trim().toLowerCase().replace(/\s+/g,' ');
+  const g = norm(got);
+  const e = norm(expected);
+  if(!e) return {score:0, status:'empty'};
+  if(!g) return {score:0, status:'empty'};
+
+  // 1. Correspondance exacte (après normalisation)
+  if(g === e) return {score:cellPts, status:'correct'};
+
+  // 2. Variantes numériques : "1.2" vs "1,2" / "1 200" vs "1200"
+  const normNum = s => s.replace(/,/g,'.').replace(/\s/g,'');
+  if(normNum(g) === normNum(e)) return {score:cellPts, status:'correct'};
+
+  // 3. Ordre inversé pour les fractions/ratios : "1.2/1.3" == "1.3/1.2"
+  const splitSeps = /[/\\|;,&+]/;
+  const gParts = g.split(splitSeps).map(s=>s.trim()).sort();
+  const eParts = e.split(splitSeps).map(s=>s.trim()).sort();
+  if(gParts.length>1 && gParts.join('|')===eParts.join('|')){
+    return {score:cellPts, status:'correct'};
+  }
+
+  // 4. Correspondance partielle : chaque partie de la réponse attendue présente ?
+  //    Ex: attendu "ISO 9001 / ISO 14001", réponse "ISO 9001" → 50% des points
+  if(eParts.length>1){
+    const matched=eParts.filter(ep=>gParts.some(gp=>gp===ep||normNum(gp)===normNum(ep)));
+    if(matched.length>0){
+      const partialPts=Math.round(cellPts * matched.length/eParts.length * 10)/10;
+      return {score:partialPts, status:'partial', detail:matched.length+'/'+eParts.length};
+    }
+  }
+
+  // 5. La réponse attendue est contenue dans la réponse donnée (ordre différent de mots)
+  const gWords=g.split(/\s+/).sort();
+  const eWords=e.split(/\s+/).sort();
+  if(eWords.length>1 && eWords.join(' ')===gWords.join(' ')){
+    return {score:cellPts, status:'correct'};
+  }
+
+  // 6. Tolérance orthographique simple : distance de Levenshtein ≤ 1 pour mots courts
+  if(e.length<=6 && g.length<=8){
+    function lev(a,b){
+      const m=a.length,n=b.length;
+      const d=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i?j?0:i:j));
+      for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+        d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);
+      return d[m][n];
+    }
+    if(lev(g,e)<=1) return {score:cellPts, status:'correct'};
+  }
+
+  return {score:0, status:'wrong'};
+}
+
 function autoGrade(q,answers){
   const sc={};
   (q.questions||[]).forEach(qq=>{
@@ -1479,9 +1535,14 @@ function autoGrade(q,answers){
     if(qq.type==='qcm'){
       sc[qq.id]=(ans===qq.options[ca])?pts:0;
     } else if(qq.type==='checkbox'){
-      const expected=(Array.isArray(ca)?ca:[]).map(i=>qq.options[i]).sort().join(',');
-      const got=(Array.isArray(ans)?[...ans]:[]).sort().join(',');
-      sc[qq.id]=(expected===got)?pts:0;
+      // Correspondance partielle : points proportionnels aux bonnes réponses cochées
+      const expected=(Array.isArray(ca)?ca:[]).map(i=>qq.options[i]);
+      const got=Array.isArray(ans)?ans:[];
+      if(expected.length===0){sc[qq.id]=0;return;}
+      const correct=expected.filter(e=>got.includes(e)).length;
+      const extra=got.filter(g=>!expected.includes(g)).length; // mauvaises cases cochées
+      const score=Math.max(0,Math.round(pts*(correct-extra)/expected.length*10)/10);
+      sc[qq.id]=score;
     } else if(qq.type==='yesno'){
       sc[qq.id]=(ans===ca)?pts:0;
     } else if(qq.type==='scale'){
@@ -1496,12 +1557,12 @@ function autoGrade(q,answers){
           const expAns=cell&&typeof cell==='object'?cell.answer||'':cell||'';
           const cellPts=cell&&typeof cell==='object'?+(cell.points||0):0;
           const got=((row.cols&&row.cols[ci])||'').trim();
-          if(!expAns.trim()){hasManual=true;return;} // pas de réponse attendue = manuel
-          const correct=got.toLowerCase()===expAns.trim().toLowerCase();
-          totalEarned+=correct?cellPts:0;
+          if(!expAns.trim()){hasManual=true;return;}
+          const {score}=smartMatch(got,expAns,cellPts);
+          totalEarned+=score;
         });
       });
-      sc[qq.id]=hasManual?null:totalEarned;
+      sc[qq.id]=hasManual?null:Math.round(totalEarned*10)/10;
     } else {
       sc[qq.id]=null;
     }
@@ -1893,8 +1954,9 @@ async function viewResponses(qid){
             const cellPts=cell&&typeof cell==='object'?+(cell.points||0):0;
             const hasExp=expAns.trim()!=='';
             let bg='';
+            let _mr=hasExp&&got?smartMatch(got,expAns,cellPts):{status:'empty',score:0};
             if(hasExp&&got){
-              bg=got.toLowerCase()===expAns.trim().toLowerCase()?'background:#eaf3de':'background:#fcebeb';
+              bg=_mr.status==='correct'?'background:#eaf3de':_mr.status==='partial'?'background:#fef9c3':'background:#fcebeb';
             }
             const manCellKey='cell_'+ri+'_'+ci;
             const manVal=manSc[qq.id]&&manSc[qq.id][manCellKey]!==undefined?manSc[qq.id][manCellKey]:'';
