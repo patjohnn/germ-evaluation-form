@@ -1687,15 +1687,15 @@ function onDrop(e, targetId) {
 function uploadQImg(qid, input){
   const file=input.files[0];
   if(!file) return;
-  const reader=new FileReader();
-  reader.onload=function(e){
-    const url=e.target.result;
+  if(file.size>1024*1024){toast('Image trop grande (max 1 MB). Compressez avant import.','error');input.value='';return;}
+  if(!file.type.startsWith('image/')){toast('Format invalide. JPG, PNG ou WebP uniquement.','error');input.value='';return;}
+  compressAndLoad(file,800,85,function(url,sizeKB){
     uQ(qid,'image_url',url);
     updateQImgPreview(qid,url);
     const urlEl=document.getElementById('qimg-url-'+qid);
-    if(urlEl) urlEl.value='(image uploadée)';
-  };
-  reader.readAsDataURL(file);
+    if(urlEl) urlEl.value='(image '+sizeKB+' KB)';
+    toast('Image chargée ('+sizeKB+' KB)');
+  });
 }
 
 function updateQImgPreview(qid, url){
@@ -4601,17 +4601,17 @@ document.addEventListener('DOMContentLoaded',()=>{
 function handleLogoUpload(input){
   const file=input.files[0];
   if(!file) return;
-  const reader=new FileReader();
-  reader.onload=function(e){
-    const url=e.target.result;
+  if(file.size>500*1024){toast('Logo trop grand (max 500 KB). Compressez avant import.','error');input.value='';return;}
+  if(!file.type.startsWith('image/')){toast('Format invalide. JPG, PNG ou WebP uniquement.','error');input.value='';return;}
+  compressAndLoad(file,200,80,function(url,sizeKB){
     const urlEl=document.getElementById('q-logo-url');
     if(urlEl) urlEl.value=url;
     const img=document.getElementById('q-logo-img');
     const prev=document.getElementById('q-logo-preview');
     if(img) img.src=url;
     if(prev) prev.style.display='block';
-  };
-  reader.readAsDataURL(file);
+    toast('Logo chargé ('+sizeKB+' KB)');
+  });
 }
 
 function applyQuestionnaireBranding(q){
@@ -4811,6 +4811,31 @@ async function confirmNewPassword(){
 }
 
 // ─── DARK MODE ────────────────────────────────────── ────────────────────────────────────────
+// -- COMPRESSION IMAGES --
+function compressAndLoad(file,maxWidth,quality,callback){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      const canvas=document.createElement('canvas');
+      let w=img.width,h=img.height;
+      if(w>maxWidth){h=Math.round(h*maxWidth/w);w=maxWidth;}
+      canvas.width=w;canvas.height=h;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      const isPng=file.type==='image/png';
+      const mime=isPng?'image/png':'image/jpeg';
+      const q=isPng?1:(quality/100);
+      const url=canvas.toDataURL(mime,q);
+      const sizeKB=Math.round(url.length*0.75/1024);
+      callback(url,sizeKB);
+    };
+    img.onerror=function(){callback(e.target.result,Math.round(file.size/1024));};
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function initDarkMode(){
   const saved=localStorage.getItem('evalpro_theme');
   if(saved==='dark'){
