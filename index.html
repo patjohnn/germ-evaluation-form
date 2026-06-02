@@ -5095,19 +5095,43 @@ function initOfflineDetector(){
 }
 
 // -- QR CODE --
-function showQRCode(code, title){
+function showQRCode(code,title){
   const url=window.location.origin+window.location.pathname+'?q='+code;
-  document.getElementById('qr-modal-title').textContent=title;
-  document.getElementById('qr-url-display').textContent=url;
+  const titleEl=document.getElementById('qr-modal-title');
+  const urlEl=document.getElementById('qr-url-display');
+  const cont=document.getElementById('qr-container');
+  if(titleEl)titleEl.textContent=title;
+  if(urlEl)urlEl.textContent=url;
+  if(cont)cont.innerHTML='<div style="padding:1rem;color:#999;font-size:12px">Generation...</div>';
   openModal('modal-qr');
   setTimeout(()=>{
-    const canvas=document.getElementById('qr-canvas');
-    if(canvas && typeof QRCode !== 'undefined'){
-      QRCode.toCanvas(canvas, url, {width:240,margin:2,color:{dark:'#1a1a2e',light:'#ffffff'}}, function(err){
-        if(err) console.warn('QR error:',err);
-      });
-    }
-  },100);
+    if(!cont)return;
+    if(typeof QRCode!=='undefined'){
+      try{
+        const cv=document.createElement('canvas');
+        QRCode.toCanvas(cv,url,{width:250,margin:2,color:{dark:'#1a1a2e',light:'#ffffff'}},function(err){
+          if(!err){cont.innerHTML='';cont.appendChild(cv);return;}
+          loadQRImg(cont,url);
+        });
+        return;
+      }catch(e){loadQRImg(cont,url);}
+    } else {loadQRImg(cont,url);}
+  },300);
+}
+
+function loadQRImg(cont,url){
+  const img=document.createElement('img');
+  img.style.cssText='width:250px;height:250px;display:block;border-radius:8px';
+  img.src='https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='+encodeURIComponent(url)+'&bgcolor=ffffff&color=1a1a2e&margin=10';
+  img.onerror=function(){cont.innerHTML='<div style="color:#ef4444;font-size:12px;padding:1rem">Erreur QR Code. Copiez le lien.</div>';};
+  cont.innerHTML='';
+  cont.appendChild(img);
+}
+
+
+function copyQRUrl(){
+  const txt=document.getElementById("qr-url-display")?.textContent||"";
+  navigator.clipboard.writeText(txt).then(()=>toast("Lien copie !")).catch(()=>toast("Impossible","error"));
 }
 
 function downloadQR(){
@@ -5345,12 +5369,14 @@ init();
       <div><div class="mtitle">&#127381; QR Code</div><div class="msub" id="qr-modal-title"></div></div>
       <button class="close-btn" onclick="closeModal('modal-qr')">&#10005;</button>
     </div>
-    <div style="background:#fff;border-radius:12px;padding:1.5rem;margin:.5rem 0;display:inline-block">
-      <canvas id="qr-canvas"></canvas>
+    <div style="background:#fff;border-radius:12px;padding:1rem;margin:.5rem 0;display:inline-flex;align-items:center;justify-content:center;min-height:270px;min-width:270px">
+      <div id="qr-container"><canvas id="qr-canvas" style="display:none"></canvas></div>
     </div>
-    <div style="font-size:12px;color:var(--text2);margin:.5rem 0" id="qr-url-display"></div>
+    <div style="font-size:11px;color:var(--text2);margin:.5rem 0;word-break:break-all;background:var(--bg2);border-radius:6px;padding:6px 10px" id="qr-url-display"></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.25rem">Scannez avec l'app cam&#233;ra ou une app QR Code</div>
     <div class="mactions" style="justify-content:center;margin-top:.75rem">
-      <button class="btn btn-sm" onclick="downloadQR()">&#11015; T&#233;l&#233;charger PNG</button>
+      <button class="btn btn-sm" onclick="downloadQR()">&#11015; PNG</button>
+      <button class="btn btn-sm" onclick="copyQRUrl()">&#128203; Lien</button>
       <button class="btn btn-sm" onclick="printQR()">&#128438; Imprimer</button>
     </div>
   </div>
