@@ -1994,6 +1994,132 @@ function _buildResponsesHTML(rs,qs,total,totalPages){
   return html;
 }
 
+async function toggleRespDetail(rid,qid){
+  const dd=document.getElementById('resp-detail-'+rid);
+  if(!dd) return;
+  if(dd.style.display==='block'){
+    dd.style.display='none';
+    return;
+  }
+  dd.style.display='block';
+  if(dd.dataset.loaded==='1') return;
+  dd.dataset.loaded='1';
+  dd.innerHTML='<div style="padding:1rem;color:var(--text3);font-size:13px">Chargement...</div>';
+  const [{data:q},{data:r}]=await Promise.all([
+    SB.from('questionnaires').select('*').eq('id',qid).single(),
+    SB.from('responses').select('*').eq('id',rid).single()
+  ]);
+  if(!q||!r){dd.innerHTML='<div style="color:var(--red-text);padding:1rem">Erreur.</div>';return;}
+  dd.innerHTML=buildRespDetailHtml(q,r);
+}
+
+function buildRespDetailHtml(q,r){
+  const autoSc=autoGrade(q,r.answers||{});
+  const manSc=r.manual_scores||{};
+  const totalPts=calcTotalPts(q);
+  let earned=0,pending=0;
+  (q.questions||[]).forEach(qq=>{
+    const ms=manSc[qq.id],as=autoSc[qq.id];
+    if(ms!==undefined&&ms!==null)earned+=+ms;
+    else if(as!==null&&as!==undefined)earned+=+as;
+    else pending++;
+  });
+  const pct=totalPts>0?Math.round(earned/totalPts*100):0;
+  const m=getMention(pct);
+  const sc=pct>=75?'var(--green-text)':pct>=50?'var(--amber-text)':'var(--red-text)';
+  let html='<div style="padding:1rem;border-top:.5px solid var(--border)">';
+  html+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:.75rem">';
+  html+='<div style="font-weight:700;color:'+sc+'">'+earned+'/'+totalPts+' pts ('+pct+'%) — '+m.txt+'</div>';
+  html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+  if(canCorrect())html+='<button class="btn btn-sm btn-success" data-rid="'+r.id+'" data-qid="'+q.id+'" onclick="saveGrade(this.dataset.rid,this.dataset.qid)">&#128190; Enregistrer</button>';
+  html+='<button class="btn btn-sm" onclick="adminDownloadPDF(this.dataset.rid)" data-rid="'+r.id+'">&#128196; PDF</button>';
+  if(q.cert_threshold&&pct>=+q.cert_threshold)html+='<button class="btn btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none" data-rid="'+r.id+'" data-qid="'+q.id+'" onclick="adminGenerateCert(this.dataset.rid,this.dataset.qid)">&#127881; Certificat</button>';
+  html+='</div></div>';
+  (q.questions||[]).forEach((qq,qi)=>{
+    const ans=(r.answers||{})[qq.id];
+    const ms=manSc[qq.id],as=autoSc[qq.id],pts=qq.points||1;
+    const curPts=ms!==undefined?ms:as;
+    const ca=qq.correctAnswer;
+    let stHtml='';
+    if(curPts===null||curPts===undefined)stHtml='<span class="badge bg-amber" style="font-size:10px">A corriger</span>';
+    else if(+curPts>=pts)stHtml='<span class="badge bg-green" style="font-size:10px">'+curPts+'/'+pts+'</span>';
+    else if(+curPts>0)stHtml='<span class="badge bg-amber" style="font-size:10px">'+curPts+'/'+pts+'</span>';
+    else stHtml='<span class="badge bg-red" style="font-size:10px">0/'+pts+'</span>';
+    html+='<div style="border:.5px solid var(--border);border-radius:8px;margin-bottom:.5rem;overflow:hidden">';
+    html+='<div style="background:var(--bg2);padding:6px 10px;display:flex;justify-content:space-between;align-items:center;gap:6px">';
+    html+='<div style="font-size:12px;font-weight:600">'+(qi+1)+'. '+esc(qq.label||qq.type)+'</div>';
+    html+='<div style="display:flex;align-items:center;gap:4px">'+stHtml;
+    if(qq.type!=='table'&&canCorrect())html+='<input type="number" min="0" max="'+pts+'" value="'+(ms!==undefined?ms:'')+'" id="ms-'+r.id+'-'+qq.id+'" style="width:48px;font-size:11px;padding:2px 4px;border:.5px solid var(--border2);border-radius:4px;text-align:center"><span style="font-size:10px;color:var(--text3)">/'+pts+'pt</span>';
+    html+='</div></div><div style="padding:6px 10px">';
+    if(qq.type==='table'&&ans&&ans.rows){
+      const ca2=qq.correctAnswer;
+      html+='<div style="overflow-x:auto"><table class="rtbl" style="width:100%;font-size:12px"><thead><tr><th>Phrase</th>'+(qq.columns||[]).map(col=>'<th>'+esc(col)+'</th>').join('')+'</tr></thead><tbody>';
+      ans.rows.forEach((rw,ri)=>{
+        const expRow=Array.isArray(ca2)?ca2[ri]:null;
+        html+='<tr><td style="font-size:11px;color:var(--text2)">'+esc(rw.phrase||'L'+(ri+1))+'</td>';
+        (qq.columns||[]).forEach((_,ci)=>{
+          const got=((rw.cols&&rw.cols[ci])||'').trim();
+          const cell=expRow&&expRow[ci];
+          const expAns=cell&&typeof cell==='object'?cell.answer||'':cell||'';
+          const cellPts=cell&&typeof cell==='object'?+(cell.points||0):0;
+          const hasExp=expAns.trim()!=='';
+          const mr=hasExp&&got?smartMatch(got,expAns,cellPts):{status:'empty',score:0};
+          const bg=hasExp&&got?(mr.status==='correct'?'#eaf3de':mr.status==='partial'?'#fef9c3':'#fcebeb'):'';
+          const manCK='cell_'+ri+'_'+ci;
+          const manVal=manSc[qq.id]&&manSc[qq.id][manCK]!==undefined?manSc[qq.id][manCK]:'';
+          html+='<td style="background:'+bg+';vertical-align:top;padding:4px 6px"><div>'+esc(got||'—')+'</div>';
+          if(hasExp)html+='<div style="font-size:10px;color:#888">Att: '+esc(expAns)+'</div>';
+          if(canCorrect())html+='<input type="number" min="0" max="'+cellPts+'" value="'+manVal+'" id="ms-'+r.id+'-'+qq.id+'-c-'+ri+'-'+ci+'" style="width:42px;font-size:10px;padding:2px;border:.5px solid var(--border2);border-radius:3px;text-align:center">';
+          html+='</td>';
+        });
+        html+='</tr>';
+      });
+      html+='</tbody></table></div>';
+    } else {
+      const ansStr=Array.isArray(ans)?ans.join(', '):(ans!=null?String(ans):'—');
+      html+='<div style="font-size:12px;background:var(--bg3);border-radius:6px;padding:5px 8px">'+esc(ansStr)+'</div>';
+      if(ca!==null&&ca!==undefined){
+        let caStr='';
+        if(qq.type==='qcm'&&qq.options)caStr=qq.options[ca]||'';
+        else if(qq.type==='yesno')caStr=String(ca);
+        if(caStr)html+='<div style="font-size:11px;color:var(--green-text);margin-top:3px">Attendu : '+esc(caStr)+'</div>';
+      }
+    }
+    const comment=(r.comments||{})[qq.id];
+    if(comment)html+='<div style="font-size:11px;color:var(--blue-text);background:var(--blue-bg);border-radius:6px;padding:4px 8px;margin-top:4px">'+esc(comment)+'</div>';
+    if(canCorrect())html+='<input type="text" placeholder="Commentaire..." id="cm-'+r.id+'-'+qq.id+'" value="'+esc(comment||'')+'" style="width:100%;margin-top:4px;font-size:11px;padding:3px 6px;border:.5px solid var(--border2);border-radius:4px">';
+    html+='</div></div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+async function adminGenerateCert(rid,qid){
+  const [{data:q},{data:r}]=await Promise.all([
+    SB.from('questionnaires').select('*').eq('id',qid).single(),
+    SB.from('responses').select('*').eq('id',rid).single()
+  ]);
+  if(!q||!r){toast('Introuvable.','error');return;}
+  const autoSc=autoGrade(q,r.answers||{});
+  const manSc=r.manual_scores||{};
+  const totalPts=calcTotalPts(q);
+  let earned=0;
+  (q.questions||[]).forEach(qq=>{
+    const ms=manSc[qq.id],as=autoSc[qq.id];
+    if(ms!==undefined&&ms!==null)earned+=+ms;
+    else if(as!==null&&as!==undefined)earned+=+as;
+  });
+  const pct=totalPts>0?Math.round(earned/totalPts*100):0;
+  const name=r.group_name||r.respondent_name||'Repondant';
+  const b64=generateCertificatePDF(q,name,earned,pct,getMention(pct).txt,q.cert_title||'Certificat de reussite');
+  if(!b64){toast('Erreur certificat.','error');return;}
+  const a=document.createElement('a');
+  a.href='data:application/pdf;base64,'+b64;
+  a.download='Certificat_'+name.replace(/\s+/g,'_').slice(0,25)+'.pdf';
+  a.click();
+  toast('Certificat telecharge !');
+}
+
 async function _goRespPage(page){
   _respPage=page;
   await _loadResponses();
@@ -4417,11 +4543,46 @@ async function loadUsers(){
           <div style="font-size:11px;color:var(--text2)">${esc(u.email)}</div>
         </div>
         <span class="role-badge ${roleCls[u.role]||'role-viewer'}">${roleLbl[u.role]||u.role}</span>
-        <button class="btn btn-xs btn-danger" data-uid="${u.id}" onclick="deleteUser(this.dataset.uid)">&#10005;</button>
+        <button class="btn btn-xs" data-uid="${u.id}" data-uname="${esc(u.name)}" data-email="${esc(u.email)}" data-role="${u.role}" data-active="${u.active}" onclick="openEditUser(this.dataset)" title="Modifier">&#9999;</button>
+        <button class="btn btn-xs btn-danger" data-uid="${u.id}" onclick="deleteUser(this.dataset.uid)" title="Supprimer">&#10005;</button>
       </div>`).join('');
   }catch(e){
     el.innerHTML='<div style="color:var(--red-text);font-size:12px">Erreur: '+esc(e.message)+'</div>';
   }
+}
+
+function openEditUser(ds){
+  document.getElementById('edit-user-id').value=ds.uid||'';
+  document.getElementById('edit-user-name').value=ds.uname||ds.name||'';
+  document.getElementById('edit-user-pwd').value='';
+  document.getElementById('edit-user-role').value=ds.role||'admin';
+  document.getElementById('edit-user-active').value=(ds.active==='true'||ds.active===true)?'1':'0';
+  const sub=document.getElementById('edit-user-subtitle');
+  if(sub) sub.textContent=ds.email||'';
+  openModal('modal-edit-user');
+}
+
+async function updateUser(){
+  const uid=document.getElementById('edit-user-id').value;
+  const name=(document.getElementById('edit-user-name')?.value||'').trim();
+  const pwd=(document.getElementById('edit-user-pwd')?.value||'').trim();
+  const role=document.getElementById('edit-user-role').value;
+  const active=document.getElementById('edit-user-active').value==='1';
+  if(!uid||!name){toast('Nom requis.','error');return;}
+  if(pwd&&pwd.length<6){toast('Mot de passe trop court.','error');return;}
+  const btn=document.getElementById('edit-user-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='Enregistrement...';}
+  try{
+    const upd={name,role,active};
+    if(pwd) upd.password_hash=await hashPwd(pwd);
+    const{error}=await SB.from('app_users').update(upd).eq('id',uid);
+    if(error) throw error;
+    toast('Compte mis a jour !');
+    closeModal('modal-edit-user');
+    loadUsers();
+    if(currentUser&&currentUser.id===uid){currentUser.name=name;currentUser.role=role;applyRoleRestrictions();}
+  }catch(e){toast('Erreur: '+e.message,'error');}
+  finally{if(btn){btn.disabled=false;btn.textContent='Enregistrer';}}
 }
 
 async function deleteUser(uid){
@@ -5383,6 +5544,32 @@ init();
 </div>
 
 <div class="modal-overlay" id="modal-abandon"><div class="modal" style="max-width:540px"><div class="mhdr"><div><div class="mtitle">&#9203; Progressions</div><div class="msub">Abandonnees sans soumission</div></div><button class="close-btn" onclick="closeModal('modal-abandon')">&#10005;</button></div><div id="abandon-list" style="max-height:340px;overflow-y:auto"></div><div class="mactions"><button class="btn" onclick="closeModal('modal-abandon')">Fermer</button><button class="btn btn-primary" onclick="sendAllReminders()">&#128140; Rappels</button></div></div></div>
+
+<!-- MODAL: Modifier compte -->
+<div class="modal-overlay" id="modal-edit-user">
+  <div class="modal" style="max-width:440px">
+    <div class="mhdr">
+      <div><div class="mtitle">&#9999; Modifier le compte</div><div class="msub" id="edit-user-subtitle"></div></div>
+      <button class="close-btn" onclick="closeModal('modal-edit-user')">&#10005;</button>
+    </div>
+    <input type="hidden" id="edit-user-id">
+    <div class="fgroup"><label class="flabel">Nom complet</label><input type="text" id="edit-user-name"></div>
+    <div class="fgroup"><label class="flabel">Nouveau mot de passe <span style="font-weight:400;color:var(--text3)">(vide = inchang&#233;)</span></label><input type="password" id="edit-user-pwd" placeholder="Min. 6 caract&#232;res"></div>
+    <div class="frow2">
+      <div class="fgroup" style="margin-bottom:0"><label class="flabel">R&#244;le</label>
+        <select id="edit-user-role"><option value="admin">Administrateur</option><option value="corrector">Correcteur</option><option value="viewer">Lecteur</option></select>
+      </div>
+      <div class="fgroup" style="margin-bottom:0"><label class="flabel">Statut</label>
+        <select id="edit-user-active"><option value="1">Actif</option><option value="0">D&#233;sactiv&#233;</option></select>
+      </div>
+    </div>
+    <div class="field-hint" style="margin-top:.75rem">Modifier le r&#244;le prend effet lors de la prochaine connexion du compte.</div>
+    <div class="mactions">
+      <button class="btn" onclick="closeModal('modal-edit-user')">Annuler</button>
+      <button class="btn btn-primary" id="edit-user-save-btn" onclick="updateUser()">&#10003; Enregistrer</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
