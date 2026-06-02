@@ -2978,21 +2978,39 @@ function generatePDF(q, members, answers, sigData, scoreInfo, comments, manualSc
     if(q.logo_url){ try{doc.addImage(q.logo_url,'PNG',ML,6,24,18);}catch(e){} }
     y=42;
 
-    // SCORE BANNER
-    if(scoreInfo){
-      const pct=scoreInfo.pct;
-      const men=getMention(pct);
-      const bg=pct>=75?[240,253,244]:pct>=50?[254,249,195]:[254,242,242];
-      const tx=pct>=75?[22,101,52]:pct>=50?[113,63,18]:[153,27,27];
-      doc.setFillColor(bg[0],bg[1],bg[2]);
-      doc.roundedRect(ML,y,W-ML-MR,22,3,3,'F');
-      doc.setDrawColor(tx[0],tx[1],tx[2]); doc.setLineWidth(0.4);
-      doc.roundedRect(ML,y,W-ML-MR,22,3,3,'S');
-      sf('bold',16,tx);
-      doc.text(scoreInfo.earned+' / '+scoreInfo.totalPts+' pts',W/2,y+9,{align:'center'});
-      sf('bold',11,tx);
-      doc.text(pct+'%   —   '+men.txt,W/2,y+17,{align:'center'});
-      y+=28;
+    // SCORE BANNER — score recalcule en temps reel
+    {
+      const _autoSc=autoGrade(q,answers||{});
+      const _totalPts=calcTotalPts(q);
+      let _earned=0,_pending=0;
+      (q.questions||[]).forEach(qq=>{
+        const _as=_autoSc[qq.id];
+        const _ms=(manualScores||{})[qq.id];
+        if(_ms!==undefined&&_ms!==null){
+          if(typeof _ms==="object"&&!Array.isArray(_ms)) _earned+=Object.values(_ms).reduce((a,v)=>a+(+v||0),0);
+          else _earned+=+_ms;
+        } else if(_as!==null&&_as!==undefined){ _earned+=+_as; }
+        else _pending++;
+      });
+      const _pct=_totalPts>0?Math.round(_earned/_totalPts*100):0;
+      const _men=getMention(_pct);
+      const showPct=_pending===0?_pct:(scoreInfo?scoreInfo.pct:null);
+      const showEarned=_pending===0?_earned:(scoreInfo?scoreInfo.earned:null);
+      const showTotal=_totalPts||(scoreInfo?scoreInfo.totalPts:0);
+      if(showPct!==null&&showEarned!==null){
+        const men2=getMention(showPct);
+        const bg=showPct>=75?[240,253,244]:showPct>=50?[254,249,195]:[254,242,242];
+        const tx=showPct>=75?[22,101,52]:showPct>=50?[113,63,18]:[153,27,27];
+        doc.setFillColor(bg[0],bg[1],bg[2]);
+        doc.roundedRect(ML,y,W-ML-MR,22,3,3,'F');
+        doc.setDrawColor(tx[0],tx[1],tx[2]); doc.setLineWidth(0.4);
+        doc.roundedRect(ML,y,W-ML-MR,22,3,3,'S');
+        sf('bold',16,tx);
+        doc.text(showEarned+' / '+showTotal+' pts',W/2,y+9,{align:'center'});
+        sf('bold',11,tx);
+        doc.text(showPct+'%   —   '+men2.txt,W/2,y+17,{align:'center'});
+        y+=28;
+      }
     }
 
     // INFOS RESPONDANT
