@@ -524,6 +524,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     </div>
     <div style="text-align:center;margin-top:.75rem">
       <button onclick="showHashHelper()" style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;font-family:inherit;text-decoration:underline">Problème de connexion ?</button>
+      <button onclick="openModal('modal-reset-pwd')" style="background:none;border:none;font-size:12px;color:#8b5cf6;cursor:pointer;font-family:inherit;text-decoration:underline;display:block;width:100%;text-align:center;margin-top:4px">&#128273; Mot de passe oubli&#233; ?</button>
     </div>
     <hr style="border:none;border-top:.5px solid var(--border);margin:1.5rem 0">
     <div style="font-size:12px;color:var(--text3);margin-bottom:.5rem">Accéder à un questionnaire en tant que répondant :</div>
@@ -842,6 +843,8 @@ async function init(){
     const {error}=await SB.from('questionnaires').select('id').limit(1);
     if(error) throw error;
     hideLov();
+    const resetToken=new URLSearchParams(window.location.search).get('reset');
+    if(resetToken){ await handleResetToken(resetToken); return; }
     const shareToken=new URLSearchParams(window.location.search).get('share');
     if(shareToken){ await loadSharedResult(shareToken); return; }
     if(code){ await loadRespondentByCode(code); return; }
@@ -2346,6 +2349,29 @@ function renderSettings(){
         <button class="btn btn-primary btn-sm" onclick="openNewUserModal()">+ Nouveau compte</button>
       </div>
       <div id="users-list"></div>
+    </div>
+    <div class="card">
+      <div class="sec-title">&#128140; EmailJS — R&#233;initialisation mot de passe</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem;line-height:1.6">
+        Ces cl&#233;s sont utilis&#233;es pour envoyer les emails de r&#233;initialisation.<br>
+        Cr&#233;ez un template EmailJS avec les variables : <code>to_email</code>, <code>reset_link</code>, <code>user_name</code>.
+      </div>
+      <div class="frow3" style="margin-bottom:.75rem">
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Service ID</label>
+          <input type="text" id="gs-emailjs-service" placeholder="service_xxx">
+        </div>
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Template ID</label>
+          <input type="text" id="gs-emailjs-template" placeholder="template_xxx">
+        </div>
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Public Key</label>
+          <input type="text" id="gs-emailjs-key" placeholder="user_xxx ou votre Public Key">
+        </div>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="saveEmailJSSettings()">&#128190; Enregistrer les cl&#233;s</button>
+      <div id="emailjs-settings-status" style="font-size:12px;margin-top:.5rem;color:var(--green-text)"></div>
     </div>
     <div class="card"><div class="sec-title">Export</div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
@@ -4622,6 +4648,167 @@ function guardRole(required){
   return true;
 }
 
+// ─── RÉINITIALISATION MOT DE PASSE ──────────────────
+// Paramètres EmailJS globaux (chargés depuis Supabase app_settings)
+let _gjsService='', _gjsTemplate='', _gjsKey='';
+
+async function loadEmailJSSettings(){
+  if(!SB) return;
+  try{
+    const {data}=await SB.from('app_settings').select('*').in('key',['emailjs_service','emailjs_template','emailjs_key']);
+    if(!data) return;
+    const map=Object.fromEntries(data.map(r=>[r.key,r.value||'']));
+    _gjsService=map.emailjs_service||'';
+    _gjsTemplate=map.emailjs_template||'';
+    _gjsKey=map.emailjs_key||'';
+    const s=document.getElementById('gs-emailjs-service');
+    const t=document.getElementById('gs-emailjs-template');
+    const k=document.getElementById('gs-emailjs-key');
+    if(s) s.value=_gjsService;
+    if(t) t.value=_gjsTemplate;
+    if(k) k.value=_gjsKey;
+  }catch(e){console.warn('loadEmailJSSettings:',e);}
+}
+
+async function saveEmailJSSettings(){
+  if(!SB) return;
+  const s=(document.getElementById('gs-emailjs-service')?.value||'').trim();
+  const t=(document.getElementById('gs-emailjs-template')?.value||'').trim();
+  const k=(document.getElementById('gs-emailjs-key')?.value||'').trim();
+  if(!s||!t||!k){toast('Remplissez tous les champs EmailJS.','error');return;}
+  try{
+    await Promise.all([
+      SB.from('app_settings').upsert({key:'emailjs_service',value:s}),
+      SB.from('app_settings').upsert({key:'emailjs_template',value:t}),
+      SB.from('app_settings').upsert({key:'emailjs_key',value:k}),
+    ]);
+    _gjsService=s; _gjsTemplate=t; _gjsKey=k;
+    const statusEl=document.getElementById('emailjs-settings-status');
+    if(statusEl){statusEl.textContent='Cl\u00e9s enregistr\u00e9es avec succ\u00e8s !';setTimeout(()=>statusEl.textContent='',3000);}
+    toast('Param\u00e8tres EmailJS sauvegard\u00e9s !');
+  }catch(e){toast('Erreur: '+e.message,'error');}
+}
+
+async function requestPasswordReset(){
+  const email=(document.getElementById('reset-email')?.value||'').trim().toLowerCase();
+  if(!email||!email.includes('@')){toast('Email invalide.','error');return;}
+
+  // V\u00e9rifier les cl\u00e9s EmailJS
+  if(!_gjsService||!_gjsTemplate||!_gjsKey){
+    const warnEl=document.getElementById('reset-emailjs-warn');
+    if(warnEl){
+      warnEl.style.display='block';
+      warnEl.textContent='EmailJS non configur\u00e9. Demandez \u00e0 l\'administrateur de configurer les cl\u00e9s dans Param\u00e8tres \u2192 EmailJS.';
+    }
+    return;
+  }
+
+  const btn=document.getElementById('reset-send-btn');
+  if(btn){btn.disabled=true;btn.textContent='Envoi en cours...';}
+
+  try{
+    // V\u00e9rifier que l\'email existe en base
+    const {data:users}=await SB.from('app_users').select('id,name,email').eq('email',email).eq('active',true);
+    if(!users||users.length===0){
+      // Ne pas r\u00e9v\u00e9ler si l'email existe ou non (s\u00e9curit\u00e9)
+      // On passe quand m\u00eame \u00e0 l'\u00e9tape 2 pour \u00e9viter l'enum\u00e9ration
+      document.getElementById('reset-step-1').style.display='none';
+      document.getElementById('reset-step-2').style.display='block';
+      return;
+    }
+
+    const user=users[0];
+    const token=uid()+uid()+uid(); // 48 chars unique
+    const expiresAt=new Date(Date.now()+3600000).toISOString(); // 1 heure
+
+    // Supprimer les anciens tokens pour cet email
+    await SB.from('password_resets').delete().eq('email',email);
+
+    // Ins\u00e9rer le nouveau token
+    const {error}=await SB.from('password_resets').insert({
+      id:uid(), email, token,
+      expires_at:expiresAt, used:false
+    });
+    if(error) throw error;
+
+    // Construire le lien de r\u00e9initialisation
+    const resetLink=window.location.origin+window.location.pathname+'?reset='+token;
+
+    // Envoyer l\'email via EmailJS
+    emailjs.init(_gjsKey);
+    await emailjs.send(_gjsService,_gjsTemplate,{
+      to_email:email,
+      to_name:user.name||email,
+      reset_link:resetLink,
+      app_name:'EvalPro',
+      expires_in:'1 heure'
+    });
+
+    document.getElementById('reset-step-1').style.display='none';
+    document.getElementById('reset-step-2').style.display='block';
+  }catch(e){
+    toast('Erreur d\'envoi: '+e.message,'error');
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='&#128140; Envoyer le lien';}
+  }
+}
+
+// Lancer quand ?reset=TOKEN est dans l'URL
+async function handleResetToken(token){
+  if(!SB) return;
+  try{
+    const {data:row}=await SB.from('password_resets').select('*').eq('token',token).single();
+    if(!row){showResetError('Lien invalide ou d\u00e9j\u00e0 utilis\u00e9.');return;}
+    if(row.used){showResetError('Ce lien a d\u00e9j\u00e0 \u00e9t\u00e9 utilis\u00e9.');return;}
+    if(new Date(row.expires_at)<new Date()){showResetError('Ce lien a expir\u00e9. Demandez un nouveau lien.');return;}
+    // Token valide : afficher le modal de saisie
+    window._resetToken=token;
+    window._resetEmail=row.email;
+    openModal('modal-new-pwd');
+  }catch(e){showResetError('Erreur: '+e.message);}
+}
+
+function showResetError(msg){
+  document.getElementById('login-screen').style.display='flex';
+  toast(msg,'error');
+}
+
+async function confirmNewPassword(){
+  const p1=(document.getElementById('new-pwd-1')?.value||'').trim();
+  const p2=(document.getElementById('new-pwd-2')?.value||'').trim();
+  const errEl=document.getElementById('new-pwd-error');
+  const btn=document.getElementById('new-pwd-btn');
+
+  if(!p1||p1.length<6){
+    if(errEl){errEl.style.display='block';errEl.textContent='Le mot de passe doit avoir au moins 6 caract\u00e8res.';}
+    return;
+  }
+  if(p1!==p2){
+    if(errEl){errEl.style.display='block';errEl.textContent='Les mots de passe ne correspondent pas.';}
+    return;
+  }
+  if(errEl) errEl.style.display='none';
+  if(btn){btn.disabled=true;btn.textContent='Enregistrement...';}
+
+  try{
+    const hash=await hashPwd(p1);
+    // Mettre \u00e0 jour le mot de passe
+    const {error}=await SB.from('app_users').update({password_hash:hash}).eq('email',window._resetEmail);
+    if(error) throw error;
+    // Marquer le token comme utilis\u00e9
+    await SB.from('password_resets').update({used:true}).eq('token',window._resetToken);
+    closeModal('modal-new-pwd');
+    toast('Mot de passe modifi\u00e9 avec succ\u00e8s ! Connectez-vous.');
+    // Nettoyer l'URL
+    window.history.replaceState({},'',window.location.pathname);
+    window._resetToken=null; window._resetEmail=null;
+  }catch(e){
+    if(errEl){errEl.style.display='block';errEl.textContent='Erreur: '+e.message;}
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='&#10003; Enregistrer';}
+  }
+}
+
 // ─── DARK MODE ────────────────────────────────────── ────────────────────────────────────────
 function initDarkMode(){
   const saved=localStorage.getItem('evalpro_theme');
@@ -4725,6 +4912,58 @@ init();
     <div class="mactions">
       <button class="btn" onclick="closeModal('modal-share-result')">Fermer</button>
       <button class="btn btn-primary" id="generate-share-btn" onclick="generateShareLink()">&#128279; Générer le lien</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL: Mot de passe oublié -->
+<div class="modal-overlay" id="modal-reset-pwd">
+  <div class="modal" style="max-width:420px">
+    <div class="mhdr">
+      <div><div class="mtitle">&#128273; Mot de passe oubli&#233;</div><div class="msub">Recevez un lien par email</div></div>
+      <button class="close-btn" onclick="closeModal('modal-reset-pwd')">&#10005;</button>
+    </div>
+    <div id="reset-step-1">
+      <div class="fgroup">
+        <label class="flabel">Votre adresse email</label>
+        <input type="email" id="reset-email" placeholder="votre@email.com" onkeydown="if(event.key==='Enter')requestPasswordReset()">
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:1rem;background:var(--bg2);border-radius:8px;padding:10px 12px;line-height:1.6">
+        &#9432; Un lien valable <strong>1 heure</strong> sera envoy&#233; &#224; votre email via EmailJS.
+      </div>
+      <div id="reset-emailjs-warn" style="display:none;font-size:12px;color:var(--red-text);margin-bottom:.75rem;background:var(--red-bg);border-radius:8px;padding:8px 12px"></div>
+      <div class="mactions">
+        <button class="btn" onclick="closeModal('modal-reset-pwd')">Annuler</button>
+        <button class="btn btn-primary" id="reset-send-btn" onclick="requestPasswordReset()">&#128140; Envoyer le lien</button>
+      </div>
+    </div>
+    <div id="reset-step-2" style="display:none;text-align:center;padding:1rem 0">
+      <div style="font-size:48px;margin-bottom:1rem">&#128140;</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:.5rem">Email envoy&#233; !</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">V&#233;rifiez votre bo&#238;te mail et cliquez sur le lien. Il est valable <strong>1 heure</strong>.</div>
+      <button class="btn btn-primary" onclick="closeModal('modal-reset-pwd')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Saisir nouveau mot de passe -->
+<div class="modal-overlay" id="modal-new-pwd">
+  <div class="modal" style="max-width:420px">
+    <div class="mhdr">
+      <div><div class="mtitle">&#128274; Nouveau mot de passe</div><div class="msub">Choisissez un nouveau mot de passe s&#233;curis&#233;</div></div>
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Nouveau mot de passe</label>
+      <input type="password" id="new-pwd-1" placeholder="Minimum 6 caract&#232;res" onkeydown="if(event.key==='Enter')confirmNewPassword()">
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Confirmer le mot de passe</label>
+      <input type="password" id="new-pwd-2" placeholder="R&#233;p&#233;tez le mot de passe" onkeydown="if(event.key==='Enter')confirmNewPassword()">
+    </div>
+    <div id="new-pwd-error" style="font-size:12px;color:var(--red-text);margin-bottom:.75rem;display:none;padding:8px 12px;background:var(--red-bg);border-radius:8px"></div>
+    <div class="mactions">
+      <button class="btn btn-primary" id="new-pwd-btn" onclick="confirmNewPassword()">&#10003; Enregistrer</button>
     </div>
   </div>
 </div>
