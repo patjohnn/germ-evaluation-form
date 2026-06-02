@@ -2875,7 +2875,7 @@ function startTimer(q){
   tick();
   timerInterval=setInterval(tick,1000);
 }
-function generatePDF(q, members, answers, sigData, scoreInfo){
+function generatePDF(q, members, answers, sigData, scoreInfo, comments, manualScores){
   try{
     const{jsPDF}=window.jspdf;
     if(!jsPDF) return null;
@@ -3142,8 +3142,8 @@ function generatePDF(q, members, answers, sigData, scoreInfo){
         }
       }
 
-      // Commentaire correcteur
-      const comment=q.comments&&q.comments[qq.id];
+      // Commentaire correcteur (depuis comments param ou q.comments)
+      const comment=(comments&&comments[qq.id])||(q.comments&&q.comments[qq.id]);
       if(comment){
         newPageIfNeeded(12);
         const cmLines=doc.splitTextToSize('Commentaire : '+comment,W-2*margin-14);
@@ -3325,121 +3325,211 @@ function showResultDetail(rIdx,qIdx){
   const questionnaires=JSON.parse(container.dataset.questionnaires||'[]');
   const r=responses[rIdx];
   const q=questionnaires[qIdx];
-  if(!r){return;}
+  if(!r) return;
 
   const isGraded=r.graded&&r.final_score!=null;
   const m=isGraded?getMention(r.score_pct):null;
+  const autoScores=q?autoGrade(q,r.answers||{}):{};
 
-  let html='<button class="btn btn-sm" onclick="backToMyResults()" style="margin-bottom:1rem">&#8592; Retour à la liste</button>';
+  let html='<button class="btn btn-sm" onclick="backToMyResults()" style="margin-bottom:1rem">&#8592; Retour</button>';
 
-  // Score banner
+  // ── Score banner ──────────────────────────────────────
   if(isGraded){
-    html+='<div class="score-box" style="margin-bottom:1.5rem">';
-    html+='<div style="font-size:13px;opacity:.6;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em">Résultat final</div>';
-    html+='<div class="score-num">'+r.final_score+'<span style="font-size:24px;opacity:.4"> / '+r.total_points+'</span></div>';
-    html+='<div style="font-size:15px;opacity:.6;margin-top:.25rem">'+r.score_pct+'%</div>';
     const w=Math.min(r.score_pct,100);
-    html+='<div style="background:rgba(255,255,255,.1);border-radius:99px;height:6px;margin:1rem auto;max-width:200px"><div style="background:linear-gradient(90deg,#6c63ff,#8b5cf6);width:'+w+'%;height:6px;border-radius:99px"></div></div>';
-    html+='<span style="font-size:13px;font-weight:700;padding:6px 18px;border-radius:99px;display:inline-block;background:'+m.bg+';color:'+m.fg+'">'+m.txt+'</span>';
+    const barCol=r.score_pct>=75?'#22c55e':r.score_pct>=50?'#f59e0b':'#ef4444';
+    html+='<div class="score-box" style="margin-bottom:1.5rem">';
+    html+='<div style="font-size:12px;opacity:.6;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:.05em">Résultat final</div>';
+    html+='<div class="score-num">'+r.final_score+'<span style="font-size:22px;opacity:.4"> / '+r.total_points+'</span></div>';
+    html+='<div style="font-size:14px;opacity:.7;margin-top:.25rem">'+r.score_pct+'%</div>';
+    html+='<div style="background:rgba(255,255,255,.15);border-radius:99px;height:8px;margin:1rem auto;max-width:260px">';
+    html+='<div style="background:'+barCol+';width:'+w+'%;height:8px;border-radius:99px;transition:width 1s"></div></div>';
+    html+='<span style="font-size:13px;font-weight:700;padding:6px 20px;border-radius:99px;display:inline-block;background:'+m.bg+';color:'+m.fg+'">'+m.txt+'</span>';
+    html+='</div>';
+  } else {
+    html+='<div style="background:var(--amber-bg);border:.5px solid var(--amber-border);border-radius:12px;padding:1rem;text-align:center;margin-bottom:1.5rem">';
+    html+='<div style="font-size:13px;font-weight:600;color:var(--amber-text)">&#8987; En attente de correction</div>';
+    html+='<div style="font-size:12px;color:var(--amber-text);opacity:.8;margin-top:4px">Vos réponses ont été enregistrées. La note sera disponible après correction par l\'administrateur.</div>';
     html+='</div>';
   }
 
-  // Infos répondant
-  html+='<div class="q-card" style="margin-bottom:1rem">';
-  html+='<div class="sec-title">Informations</div>';
+  // ── Infos répondant ───────────────────────────────────
+  html+='<div class="q-card" style="margin-bottom:1rem"><div class="sec-title">&#128100; Informations</div>';
   const members=r.group_members&&r.group_members.length>0?r.group_members:[{name:r.respondent_name,email:r.respondent_email}];
+  if(r.group_name) html+='<div style="font-size:14px;font-weight:700;margin-bottom:.5rem">Groupe : '+esc(r.group_name)+'</div>';
   members.forEach((mem,mi)=>{
-    if(members.length>1) html+='<div style="font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px">Membre '+(mi+1)+'</div>';
-    html+='<div style="font-size:13px;margin-bottom:2px"><strong>'+esc(mem.name||'')+'</strong> · '+esc(mem.email||'')+'</div>';
-    if(mem.genre) html+='<div style="font-size:12px;color:var(--text2)">'+esc(mem.genre)+' · '+esc(mem.fonction||'')+' · '+esc(mem.structure||'')+'</div>';
-    if(mi<members.length-1) html+='<hr style="border:none;border-top:.5px solid var(--border);margin:.5rem 0">';
+    if(members.length>1) html+='<div style="font-size:11px;color:var(--text3);font-weight:600;margin:4px 0 2px">Membre '+(mi+1)+'</div>';
+    html+='<div style="font-size:13px"><strong>'+esc(mem.name||'')+'</strong>';
+    if(mem.email) html+=' · <span style="color:var(--text2)">'+esc(mem.email)+'</span>';
+    if(mem.genre) html+=' · <span style="color:var(--text3)">'+esc(mem.genre)+'</span>';
+    if(mem.fonction) html+=' · <span style="color:var(--text3)">'+esc(mem.fonction)+'</span>';
+    html+='</div>';
+    if(mi<members.length-1) html+='<hr style="border:none;border-top:.5px solid var(--border);margin:.4rem 0">';
   });
   html+='<div style="font-size:11px;color:var(--text3);margin-top:.5rem">Soumis le '+fmt(r.created_at)+'</div>';
   html+='</div>';
 
-  // Réponses + commentaires
+  // ── Réponses — tableau style admin ────────────────────
   if(q){
+    html+='<div class="q-card" style="padding:0;overflow:hidden">';
+    html+='<div style="padding:.875rem 1rem;border-bottom:.5px solid var(--border)">';
+    html+='<div class="sec-title" style="margin:0">&#128203; Détail des réponses</div>';
+    html+='</div>';
+
+    // Légende
+    html+='<div style="display:flex;gap:12px;padding:.5rem 1rem;background:var(--bg2);border-bottom:.5px solid var(--border);font-size:11px">';
+    html+='<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#dcfce7;border:.5px solid #86efac;border-radius:3px;display:inline-block"></span>Correct</span>';
+    html+='<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#fef9c3;border:.5px solid #fde047;border-radius:3px;display:inline-block"></span>Partiel</span>';
+    html+='<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#fee2e2;border:.5px solid #fca5a5;border-radius:3px;display:inline-block"></span>Incorrect</span>';
+    html+='<span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:var(--bg3);border:.5px solid var(--border);border-radius:3px;display:inline-block"></span>Manuel</span>';
+    html+='</div>';
+
     (q.questions||[]).forEach((qq,qi)=>{
       const ans=(r.answers||{})[qq.id];
-      const ms=r.manual_scores&&r.manual_scores[qq.id];
-      const comment=r.comments&&r.comments[qq.id];
-      const autoSc=autoGrade(q,r.answers||{});
-      const pts=autoSc[qq.id]!==null&&autoSc[qq.id]!==undefined?autoSc[qq.id]:ms;
+      const ms=(r.manual_scores||{})[qq.id];
+      const comment=(r.comments||{})[qq.id];
+      const autoSc=autoScores[qq.id];
+      const pts=autoSc!==null&&autoSc!==undefined?autoSc:(ms!==undefined?ms:null);
       const maxPts=qq.type==='table'?calcTotalPts({questions:[qq]}):(qq.points||1);
+      const ca=qq.correctAnswer;
+      const hasAutoCorr=ca!==null&&ca!==undefined;
 
-      html+='<div class="q-card" style="margin-bottom:.75rem">';
-      html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">';
-      html+='<div style="font-size:13px;font-weight:600;color:var(--text);flex:1">'+(qi+1)+'. '+esc(qq.label||qq.type)+'</div>';
-      if(isGraded&&pts!==null&&pts!==undefined){
-        const ptColor=+pts>=maxPts?'var(--green-text)':+pts>0?'var(--amber-text)':'var(--red-text)';
-        html+='<div style="font-size:13px;font-weight:700;color:'+ptColor+';margin-left:1rem">'+pts+' / '+maxPts+' pts</div>';
+      // Couleur de fond selon résultat
+      let rowBg='';
+      let statusLabel='';
+      if(isGraded&&hasAutoCorr&&pts!==null){
+        if(+pts>=maxPts){rowBg='background:#f0fdf4';statusLabel='<span style="font-size:10px;font-weight:700;color:#16a34a;background:#dcfce7;padding:2px 7px;border-radius:99px">&#10003; Correct</span>';}
+        else if(+pts>0){rowBg='background:#fefce8';statusLabel='<span style="font-size:10px;font-weight:700;color:#b45309;background:#fef9c3;padding:2px 7px;border-radius:99px">&#9654; Partiel</span>';}
+        else{rowBg='background:#fef2f2';statusLabel='<span style="font-size:10px;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 7px;border-radius:99px">&#10007; Incorrect</span>';}
+      } else if(isGraded&&ms!==undefined){
+        if(+ms>=maxPts){rowBg='background:#f0fdf4';statusLabel='<span style="font-size:10px;font-weight:700;color:#16a34a;background:#dcfce7;padding:2px 7px;border-radius:99px">&#10003; Correct</span>';}
+        else if(+ms>0){rowBg='background:#fefce8';statusLabel='<span style="font-size:10px;font-weight:700;color:#b45309;background:#fef9c3;padding:2px 7px;border-radius:99px">&#9654; Partiel</span>';}
+        else{rowBg='background:#fef2f2';statusLabel='<span style="font-size:10px;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 7px;border-radius:99px">&#10007; Incorrect</span>';}
       }
-      html+='</div>';
 
-      // Réponse
-      let ansHtml='';
+      html+='<div style="'+rowBg+';border-bottom:.5px solid var(--border);padding:.875rem 1rem">';
+
+      // En-tête question
+      html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem;gap:8px">';
+      html+='<div style="font-size:13px;font-weight:600;flex:1">'+(qi+1)+'. '+esc(qq.label||'Question')+'</div>';
+      html+='<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">';
+      if(statusLabel) html+=statusLabel;
+      if(isGraded&&pts!==null){
+        const ptCol=+pts>=maxPts?'#16a34a':+pts>0?'#b45309':'#dc2626';
+        html+='<span style="font-size:13px;font-weight:700;color:'+ptCol+'">'+pts+' / '+maxPts+' pt'+(maxPts>1?'s':'')+'</span>';
+      }
+      html+='</div></div>';
+
+      // Réponse donnée
       if(qq.type==='table'&&ans&&ans.rows){
-        const filled=ans.rows.filter(rw=>rw.phrase||(rw.cols||[]).some(c=>c));
-        ansHtml='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
-        ansHtml+='<thead><tr><th style="background:var(--bg2);padding:5px 8px;border:.5px solid var(--border2);text-align:left">Phrase</th>';
-        (qq.columns||[]).forEach(c=>{ansHtml+='<th style="background:var(--bg2);padding:5px 8px;border:.5px solid var(--border2)">'+esc(c)+'</th>';});
-        ansHtml+='</tr></thead><tbody>';
-        filled.forEach(rw=>{
-          ansHtml+='<tr><td style="padding:5px 8px;border:.5px solid var(--border2)">'+esc(rw.phrase||'')+'</td>';
-          (qq.columns||[]).forEach((_,ci)=>{ansHtml+='<td style="padding:5px 8px;border:.5px solid var(--border2)">'+esc((rw.cols&&rw.cols[ci])||'')+'</td>';});
-          ansHtml+='</tr>';
+        html+='<div style="overflow-x:auto;margin:.5rem 0">';
+        html+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+        html+='<thead><tr style="background:var(--bg2)">';
+        html+='<th style="padding:6px 8px;border:.5px solid var(--border2);text-align:left;font-weight:600">Phrase / Ligne</th>';
+        (qq.columns||[]).forEach(col=>{
+          html+='<th style="padding:6px 8px;border:.5px solid var(--border2);text-align:center;font-weight:600">'+esc(col)+'</th>';
         });
-        ansHtml+='</tbody></table></div>';
-      } else if(qq.type==='checkbox'){
-        ansHtml='<div style="font-size:13px;color:var(--text)">'+esc(Array.isArray(ans)?ans.join(', '):(String(ans||'—')))+'</div>';
-      } else {
-        ansHtml='<div style="font-size:13px;color:var(--text)">'+esc(String(ans||'—'))+'</div>';
-      }
-      html+='<div style="background:var(--bg2);border-radius:8px;padding:.75rem;margin-bottom:'+( comment?'.5rem':'0')+'">'+ansHtml+'</div>';
+        html+='</tr></thead><tbody>';
 
-      // Commentaire de l'admin
+        (ans.rows||[]).forEach((rw,ri)=>{
+          const expRow=Array.isArray(ca)?ca[ri]:null;
+          html+='<tr>';
+          html+='<td style="padding:6px 8px;border:.5px solid var(--border2);color:var(--text2);font-size:11px">'+esc(rw.phrase||'Ligne '+(ri+1))+'</td>';
+          (qq.columns||[]).forEach((_,ci)=>{
+            const got=((rw.cols&&rw.cols[ci])||'').trim();
+            const cell=expRow&&expRow[ci];
+            const expAns=cell&&typeof cell==='object'?cell.answer||'':cell||'';
+            const cellPts=cell&&typeof cell==='object'?+(cell.points||0):0;
+            const hasExp=expAns.trim()!=='';
+            let cellBg='';let cellInfo='';
+            if(hasExp&&got&&isGraded){
+              const mr=smartMatch(got,expAns,cellPts);
+              if(mr.status==='correct'){cellBg='background:#dcfce7';}
+              else if(mr.status==='partial'){
+                cellBg='background:#fef9c3';
+                cellInfo='<div style="font-size:10px;color:#b45309;margin-top:3px">Partiel: '+mr.score+'/'+cellPts+' pts</div>';
+                cellInfo+='<div style="font-size:10px;color:#16a34a;margin-top:1px">&#10003; Attendu: '+esc(expAns)+'</div>';
+              } else {
+                cellBg='background:#fee2e2';
+                cellInfo='<div style="font-size:10px;color:#16a34a;margin-top:3px">&#10003; Attendu: <strong>'+esc(expAns)+'</strong></div>';
+              }
+            } else if(hasExp&&!got&&isGraded){
+              cellBg='background:#fee2e2';
+              cellInfo='<div style="font-size:10px;color:#16a34a;margin-top:3px">&#10003; Attendu: <strong>'+esc(expAns)+'</strong></div>';
+            }
+            html+='<td style="padding:6px 8px;border:.5px solid var(--border2);vertical-align:top;'+cellBg+'">';
+            html+='<div style="font-size:12px">'+esc(got||'—')+'</div>';
+            html+=cellInfo;
+            html+='</td>';
+          });
+          html+='</tr>';
+        });
+        html+='</tbody></table></div>';
+
+      } else {
+        // Autres types : afficher la réponse
+        let ansStr='—';
+        if(Array.isArray(ans)) ansStr=ans.join(', ');
+        else if(ans!==null&&ans!==undefined) ansStr=String(ans);
+
+        html+='<div style="background:rgba(0,0,0,.03);border-radius:6px;padding:.625rem .75rem;margin:.25rem 0;font-size:13px">'+esc(ansStr)+'</div>';
+
+        // Bonne réponse si incorrect/partiel
+        if(isGraded&&hasAutoCorr&&pts!==null&&+pts<maxPts){
+          let correctStr='';
+          if(qq.type==='qcm'&&qq.options) correctStr=qq.options[ca]||'';
+          else if(qq.type==='yesno') correctStr=ca;
+          else if(qq.type==='checkbox'&&Array.isArray(ca)) correctStr=ca.map(i=>qq.options[i]).join(', ');
+          if(correctStr){
+            html+='<div style="display:flex;align-items:center;gap:6px;margin-top:.35rem;font-size:12px;color:#16a34a">';
+            html+='<span>&#10003;</span><span>Bonne réponse : <strong>'+esc(correctStr)+'</strong></span>';
+            html+='</div>';
+          }
+        }
+      }
+
+      // Commentaire correcteur
       if(comment){
-        html+='<div style="background:linear-gradient(135deg,var(--blue-bg),var(--purple-bg));border:.5px solid var(--blue-border);border-radius:8px;padding:.75rem;display:flex;gap:8px">';
-        html+='<span style="font-size:16px">💬</span>';
-        html+='<div><div style="font-size:11px;font-weight:600;color:var(--blue-text);margin-bottom:2px">Commentaire du correcteur</div>';
-        html+='<div style="font-size:13px;color:var(--text)">'+esc(comment)+'</div></div>';
+        html+='<div style="display:flex;gap:8px;margin-top:.5rem;background:var(--blue-bg);border:.5px solid var(--blue-border);border-radius:8px;padding:.625rem .75rem">';
+        html+='<span>&#128172;</span>';
+        html+='<div><div style="font-size:10px;font-weight:700;color:var(--blue-text);margin-bottom:2px">Commentaire du correcteur</div>';
+        html+='<div style="font-size:12px;color:var(--text)">'+esc(comment)+'</div></div>';
         html+='</div>';
       }
-      html+='</div>';
+      html+='</div>'; // fin rowBg div
     });
+    html+='</div>'; // fin q-card tableau
   }
 
-  // Signature
+  // ── Signature ─────────────────────────────────────────
   if(r.signature){
-    html+='<div class="q-card">';
-    html+='<div class="sec-title">Signature</div>';
-    html+='<img src="'+r.signature+'" style="max-width:300px;border:.5px solid var(--border);border-radius:8px">';
+    html+='<div class="q-card" style="margin-top:1rem"><div class="sec-title">Signature</div>';
+    html+='<img src="'+r.signature+'" style="max-width:280px;border:.5px solid var(--border);border-radius:8px">';
     html+='</div>';
   }
 
-  // Bouton PDF
-  if(isGraded){
-    html+='<div style="text-align:center;margin-top:1.5rem">';
-    html+='<button class="pdf-btn" data-rid="'+r.id+'" onclick="downloadResultPDF(this.dataset.rid)">&#128196; Télécharger mon résumé PDF</button>';
-    html+='</div>';
-  }
+  // ── PDF ───────────────────────────────────────────────
+  html+='<div style="text-align:center;margin:1.5rem 0 2rem;display:flex;justify-content:center;gap:12px;flex-wrap:wrap">';
+  html+='<button class="pdf-btn" data-rid="'+r.id+'" onclick="downloadResultPDF(this.dataset.rid)">&#128196; Télécharger en PDF</button>';
+  html+='</div>';
 
   container.innerHTML=html;
 }
 
+
 async function downloadResultPDF(rid){
   const{data:r}=await SB.from('responses').select('*').eq('id',rid).single();
   const{data:q}=await SB.from('questionnaires').select('*').eq('id',r.questionnaire_id).single();
-  if(!r||!q){toast('Données introuvables.','error');return;}
+  if(!r||!q){toast('Donnees introuvables.','error');return;}
   const members=r.group_members&&r.group_members.length>0?r.group_members:[{name:r.respondent_name,email:r.respondent_email}];
   const scoreInfo=r.graded&&r.final_score!=null?{earned:r.final_score,totalPts:r.total_points,pct:r.score_pct}:null;
-  generatePDF(q,members,r.answers||{},r.signature,scoreInfo);
-  const b64=generatePDF(q,members,r.answers||{},r.signature,scoreInfo);
+  // Passer aussi les commentaires et scores manuels pour le PDF enrichi
+  const b64=generatePDF(q,members,r.answers||{},r.signature,scoreInfo,r.comments||{},r.manual_scores||{});
+  if(!b64){toast('Erreur generation PDF.','error');return;}
   const link=document.createElement('a');
   link.href='data:application/pdf;base64,'+b64;
   link.download='resultat_'+q.title.replace(/\s+/g,'_').slice(0,30)+'.pdf';
   link.click();
-  toast('PDF téléchargé !');
+  toast('PDF telecharge !');
 }
 
 
