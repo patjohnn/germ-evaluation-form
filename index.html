@@ -1471,47 +1471,51 @@ function calcTotalPts(q){
 }
 // ─── COMPARAISON INTELLIGENTE DE RÉPONSES ────────────
 function smartMatch(got, expected, cellPts){
-  // Normaliser : trim, minuscules, espaces multiples
   const norm = s => s.trim().toLowerCase().replace(/\s+/g,' ');
   const g = norm(got);
   const e = norm(expected);
   if(!e) return {score:0, status:'empty'};
   if(!g) return {score:0, status:'empty'};
 
-  // 1. Correspondance exacte (après normalisation)
+  // 1. Correspondance exacte
   if(g === e) return {score:cellPts, status:'correct'};
 
-  // 2. Variantes numériques : "1.2" vs "1,2" / "1 200" vs "1200"
+  // 2. Variantes numériques : "1,2" == "1.2" / "1200" == "1 200"
   const normNum = s => s.replace(/,/g,'.').replace(/\s/g,'');
   if(normNum(g) === normNum(e)) return {score:cellPts, status:'correct'};
 
   // 3. Ordre inversé pour les fractions/ratios : "1.2/1.3" == "1.3/1.2"
-  const splitSeps = /[/\\|;,&+]/;
-  const gParts = g.split(splitSeps).map(s=>s.trim()).sort();
-  const eParts = e.split(splitSeps).map(s=>s.trim()).sort();
-  if(gParts.length>1 && gParts.join('|')===eParts.join('|')){
+  //    Séparateurs : / \ | ; + (PAS la virgule — ambiguïté avec décimaux)
+  const splitSeps = /[/\\|;+]/;
+  const gParts = g.split(splitSeps).map(s=>s.trim()).filter(s=>s).sort();
+  const eParts = e.split(splitSeps).map(s=>s.trim()).filter(s=>s).sort();
+  if(gParts.length > 1 && gParts.join('|') === eParts.join('|')){
     return {score:cellPts, status:'correct'};
   }
 
-  // 4. Correspondance partielle : chaque partie de la réponse attendue présente ?
-  //    Ex: attendu "ISO 9001 / ISO 14001", réponse "ISO 9001" → 50% des points
-  if(eParts.length>1){
-    const matched=eParts.filter(ep=>gParts.some(gp=>gp===ep||normNum(gp)===normNum(ep)));
-    if(matched.length>0){
-      const partialPts=Math.round(cellPts * matched.length/eParts.length * 10)/10;
+  // 4. Correspondance partielle (seulement si la réponse attendue a des séparateurs)
+  if(eParts.length > 1){
+    const matched = eParts.filter(ep =>
+      gParts.some(gp => gp === ep || normNum(gp) === normNum(ep))
+    );
+    if(matched.length > 0){
+      const partialPts = Math.round(cellPts * matched.length / eParts.length * 10) / 10;
       return {score:partialPts, status:'partial', detail:matched.length+'/'+eParts.length};
     }
   }
 
-  // 5. La réponse attendue est contenue dans la réponse donnée (ordre différent de mots)
-  const gWords=g.split(/\s+/).sort();
-  const eWords=e.split(/\s+/).sort();
-  if(eWords.length>1 && eWords.join(' ')===gWords.join(' ')){
+  // 5. Ordre des mots différent (seulement si ≥ 3 mots)
+  const gWords = g.split(/\s+/).sort();
+  const eWords = e.split(/\s+/).sort();
+  if(eWords.length >= 3 && gWords.length >= 3 && eWords.join(' ') === gWords.join(' ')){
     return {score:cellPts, status:'correct'};
   }
 
-  // 6. Tolérance orthographique simple : distance de Levenshtein ≤ 1 pour mots courts
-  if(e.length<=6 && g.length<=8){
+  // 6. Tolérance orthographique : SEULEMENT si les deux mots ont ≥6 chars
+  //    Évite "C"≈"NC", "A"≈"B", "1.2"≈"1.3" etc.
+  const minLen = Math.min(g.length, e.length);
+  const maxLen = Math.max(g.length, e.length);
+  if(minLen >= 6 && maxLen <= 30){
     function lev(a,b){
       const m=a.length,n=b.length;
       const d=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i?j?0:i:j));
@@ -1519,11 +1523,16 @@ function smartMatch(got, expected, cellPts){
         d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);
       return d[m][n];
     }
-    if(lev(g,e)<=1) return {score:cellPts, status:'correct'};
+    const dist = lev(g, e);
+    // Distance ≤1 ET différence relative ≤15%
+    if(dist <= 1 && dist / maxLen <= 0.15){
+      return {score:cellPts, status:'correct'};
+    }
   }
 
   return {score:0, status:'wrong'};
 }
+
 
 function autoGrade(q,answers){
   const sc={};
