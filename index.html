@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -592,6 +593,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
 <div id="respondent-app" style="display:none">
   <div class="r-header">
     <div style="font-size:14px;font-weight:600" id="r-title">Questionnaire</div>
+    <div id="offline-badge" style="display:none;font-size:10px;font-weight:700;background:#fee2e2;color:#dc2626;padding:3px 10px;border-radius:99px">&#9889; Hors-ligne</div>
     <div style="display:flex;align-items:center;gap:12px">
       <div style="font-size:12px;color:rgba(255,255,255,.6)" id="r-sub"></div>
       <button onclick="toggleDark()" style="background:rgba(255,255,255,.1);border:.5px solid rgba(255,255,255,.2);color:#fff;border-radius:99px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit" id="r-dark-btn">🌙</button>
@@ -744,6 +746,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
         <button class="btn btn-sm" onclick="addQ('scale')">+ Échelle</button>
         <button class="btn btn-sm" onclick="addQ('table')">+ Tableau analyse</button>
         <button class="btn btn-sm" onclick="addQ('yesno')">+ Oui/Non</button>
+        <label class="btn btn-sm" style="cursor:pointer">&#128229; Importer CSV/Excel<input type="file" accept=".csv,.xlsx,.xls" style="display:none" onchange="importQuestionsFile(this)"></label>
       </div>
     </div>
     <div id="q-builder" style="max-height:320px;overflow-y:auto;padding-right:4px"></div>
@@ -991,6 +994,7 @@ async function renderQuestionnaires(){
       <td><span class="badge ${q.active?'bg-green':'bg-gray'}" style="cursor:pointer" onclick="toggleActive('${q.id}',${!q.active})">${q.active?'✓ Actif':'⏸ Inactif'}</span></td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-xs" onclick="shareQ(\'${q.id}\',\'${q.code}\')" title="Partager">🔗</button>
+        <button class="btn btn-xs" onclick="showQRCode(\'${q.code}\',\'${esc(q.title)}\')" title="QR Code">&#127381;</button>
         <button class="btn btn-xs" onclick="previewQ(\'${q.id}\')" title="Aperçu">👁️</button>
         <button class="btn btn-xs" onclick="showQStats(\'${q.id}\',\'${esc(q.title)}\')" title="Statistiques">&#128202;</button>
         <button class="btn btn-xs" onclick="duplicateQ(\'${q.id}\')" title="Dupliquer">⧉</button>
@@ -1860,60 +1864,145 @@ async function saveQuestionnaire(){
 }
 
 // ─── RESPONSES ────────────────────────────────────────
+// Pagination état global
+let _respPage=0;
+const _RESP_PER_PAGE=25;
+let _respFilters={search:'',status:'',qid:''};
+
 async function renderResponses(){
   document.getElementById('tb-title').textContent='Réponses';
   document.getElementById('tb-actions').innerHTML=`<button class="btn btn-sm" onclick="exportAllXLSX()">&#11015; Exporter XLSX</button>`;
+  _respPage=0;
+  await _loadResponses();
+}
+
+async function _loadResponses(){
   document.getElementById('content').innerHTML=loading();
-  const[{data:rs},{data:qs}]=await Promise.all([SB.from('responses').select('*').order('created_at',{ascending:false}),SB.from('questionnaires').select('id,title')]);
-  updateBadges();
-  document.getElementById('content').innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1rem">
-      <div><div class="pg-title" style="margin-bottom:.25rem">Réponses reçues</div><div style="font-size:13px;color:var(--text2)">${(rs||[]).length} soumission${(rs||[]).length>1?'s':''} — synchronisées en temps réel</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input type="text" id="search-resp" placeholder="🔍 Rechercher par nom, email..." style="font-size:13px;padding:7px 12px;width:240px;border-radius:var(--r)" oninput="filterResponses()" onkeyup="filterResponses()">
-        <select id="filter-graded" style="font-size:13px;padding:7px 10px;border-radius:var(--r)" onchange="filterResponses()">
-          <option value="all">Tous les statuts</option>
-          <option value="graded">Corrigés</option>
-          <option value="pending">En attente</option>
-        </select>
-        <select id="filter-q" style="font-size:13px;padding:7px 10px;border-radius:var(--r)" onchange="filterResponses()">
-          <option value="all">Tous les questionnaires</option>
-          ${(qs||[]).map(q=>'<option value="'+q.id+'">'+esc(q.title.slice(0,30))+'</option>').join('')}
-        </select>
-      </div>
+  const from=_respPage*_RESP_PER_PAGE;
+  const to=from+_RESP_PER_PAGE-1;
+
+  let query=SB.from('responses').select('*',{count:'exact'}).order('created_at',{ascending:false}).range(from,to);
+  if(_respFilters.qid) query=query.eq('questionnaire_id',_respFilters.qid);
+  if(_respFilters.status==='graded') query=query.eq('graded',true);
+  if(_respFilters.status==='pending') query=query.eq('graded',false);
+
+  const [{data:rs,count:total},{data:qs}]=await Promise.all([
+    query,
+    SB.from('questionnaires').select('id,title,questions')
+  ]);
+
+  const totalPages=Math.ceil((total||0)/_RESP_PER_PAGE);
+  const html=_buildResponsesHTML(rs||[],qs||[],total||0,totalPages);
+  document.getElementById('content').innerHTML=html;
+  // Filtrer côté client si recherche texte
+  if(_respFilters.search) _filterRespTable(_respFilters.search);
+}
+
+function _buildResponsesHTML(rs,qs,total,totalPages){
+  const qMap=Object.fromEntries((qs||[]).map(q=>[q.id,q]));
+  let html=`<div class="pg-title">Réponses <span style="font-size:14px;font-weight:400;color:var(--text3)">(${total} au total)</span></div>`;
+
+  // Filtres
+  html+=`<div class="card" style="padding:.75rem 1rem;margin-bottom:1rem">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="text" placeholder="&#128269; Rechercher nom / email..." id="resp-search"
+        value="${esc(_respFilters.search)}" oninput="_filterRespTable(this.value)"
+        style="flex:1;min-width:180px;font-size:13px">
+      <select id="resp-filter-status" onchange="_changeRespFilter('status',this.value)" style="font-size:13px">
+        <option value="" ${!_respFilters.status?'selected':''}>Tous les statuts</option>
+        <option value="graded" ${_respFilters.status==='graded'?'selected':''}>Corrigés</option>
+        <option value="pending" ${_respFilters.status==='pending'?'selected':''}>En attente</option>
+      </select>
+      <select id="resp-filter-q" onchange="_changeRespFilter('qid',this.value)" style="font-size:13px">
+        <option value="">Tous les questionnaires</option>
+        ${qs.map(q=>`<option value="${q.id}" ${_respFilters.qid===q.id?'selected':''}>${esc(q.title.slice(0,40))}</option>`).join('')}
+      </select>
     </div>
-    ${!(rs||[]).length?`<div class="card"><div class="empty"><div class="empty-icon">📥</div><div class="empty-title">Aucune réponse</div><div class="empty-sub">Partagez vos questionnaires pour recevoir des réponses.</div></div></div>`
-    :`<div id="resp-list-container">${(rs||[]).map(r=>{const q=(qs||[]).find(x=>x.id===r.questionnaire_id);return`<div class="resp-item" data-name="${(r.respondent_name||'').toLowerCase()}" data-email="${(r.respondent_email||'').toLowerCase()}" data-graded="${r.graded?'graded':'pending'}" data-qid="${r.questionnaire_id}"><div class="resp-meta"><div><div style="font-weight:500;font-size:14px">${esc(r.respondent_name)}</div><div style="font-size:12px;color:var(--text2)">${esc(r.respondent_email)}</div><div style="font-size:11px;color:var(--text3);margin-top:3px">${q?esc(q.title):'?'} — ${fmt(r.created_at)}</div></div><div style="display:flex;gap:6px"><button class="btn btn-xs" onclick="viewResponses('${r.questionnaire_id}')">Voir</button><button class="btn btn-xs btn-danger" onclick="delResp('${r.id}')">🗑</button></div></div></div>`;}).join('')}</div>`}`;
+  </div>`;
+
+  if(!rs.length){
+    html+=`<div class="card" style="text-align:center;padding:2rem;color:var(--text3)">Aucune réponse trouvée.</div>`;
+  } else {
+    html+=`<div id="resp-table">`;
+    rs.forEach(r=>{
+      const q=qMap[r.questionnaire_id];
+      const autoSc=q?autoGrade(q,r.answers||{}):{};
+      const manSc=r.manual_scores||{};
+      const totalPts=q?calcTotalPts(q):0;
+      let earned=0,pending=0;
+      (q?q.questions:[]).forEach(qq=>{
+        const as=autoSc[qq.id],ms=manSc[qq.id];
+        if(ms!==undefined&&ms!==null){earned+=typeof ms==='object'&&!Array.isArray(ms)?Object.values(ms).reduce((a,v)=>a+(+v||0),0):+ms;}
+        else if(as!==null&&as!==undefined){earned+=+as;}
+        else pending++;
+      });
+      const pct=pending===0&&totalPts>0?Math.round(earned/totalPts*100):r.score_pct;
+      const men=pct!=null?getMention(pct):null;
+      const qid=r.questionnaire_id;
+      html+=`<div class="resp-item" data-name="${esc((r.respondent_name||'').toLowerCase())}" data-email="${esc((r.respondent_email||'').toLowerCase())}">
+        <div class="dtbl-wrap"><table class="dtbl" style="width:100%"><thead><tr>
+          <th style="width:28%">Répondant</th><th style="width:22%">Questionnaire</th>
+          <th style="width:14%">Date</th><th style="width:12%">Note</th>
+          <th style="width:10%">Statut</th><th>Actions</th>
+        </tr></thead><tbody><tr>
+          <td><strong style="font-size:13px">${esc(r.group_name||r.respondent_name)}</strong><br>
+            <span style="font-size:11px;color:var(--text3)">${esc(r.respondent_email)}</span></td>
+          <td style="font-size:12px">${q?esc(q.title.slice(0,30)):'?'}</td>
+          <td style="font-size:12px;color:var(--text3)">${fmt(r.created_at)}</td>
+          <td style="font-weight:700;font-size:13px">${pct!=null?pct+'%':'—'}</td>
+          <td>${r.graded?`<span class="badge bg-green" style="font-size:10px">Corrigé</span>`:`<span class="badge bg-amber" style="font-size:10px">En attente</span>`}</td>
+          <td><div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end">
+            ${canCorrect()?`<button class="btn btn-xs btn-success" data-rid="${r.id}" data-qid="${qid}" onclick="saveGrade(this.dataset.rid,this.dataset.qid)">&#128190; Enregistrer</button>`:''}
+            <button class="btn btn-xs" data-rid="${r.id}" onclick="openShareModal(this.dataset.rid)" style="margin-top:2px">&#128279; Partager</button>
+            <button class="btn btn-xs" data-rid="${r.id}" onclick="adminDownloadPDF(this.dataset.rid)" style="margin-top:2px">&#128196; PDF</button>
+            ${isAdmin()?`<button class="btn btn-xs btn-danger" data-rid="${r.id}" onclick="delResp(this.dataset.rid)" style="margin-top:2px">&#128465;</button>`:''}
+          </div></td>
+        </tr></tbody></table></div>
+        <div id="resp-detail-${r.id}" class="resp-detail" style="display:none"></div>
+        <button class="btn btn-xs" style="margin:.25rem .5rem .5rem;font-size:11px" onclick="toggleRespDetail('${r.id}','${qid}')">&#128269; Voir / Corriger</button>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  // Pagination
+  if(totalPages>1){
+    html+=`<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:1.5rem;flex-wrap:wrap">`;
+    html+=`<button class="btn btn-sm" onclick="_goRespPage(0)" ${_respPage===0?'disabled':''}>«</button>`;
+    html+=`<button class="btn btn-sm" onclick="_goRespPage(${_respPage-1})" ${_respPage===0?'disabled':''}>‹</button>`;
+    const start=Math.max(0,_respPage-2), end=Math.min(totalPages-1,_respPage+2);
+    for(let p=start;p<=end;p++){
+      html+=`<button class="btn btn-sm ${p===_respPage?'btn-primary':''}" onclick="_goRespPage(${p})">${p+1}</button>`;
+    }
+    html+=`<button class="btn btn-sm" onclick="_goRespPage(${_respPage+1})" ${_respPage>=totalPages-1?'disabled':''}>›</button>`;
+    html+=`<button class="btn btn-sm" onclick="_goRespPage(${totalPages-1})" ${_respPage>=totalPages-1?'disabled':''}>»</button>`;
+    html+=`<span style="font-size:12px;color:var(--text3)">Page ${_respPage+1} / ${totalPages} — ${total} réponses</span>`;
+    html+=`</div>`;
+  }
+  return html;
 }
 
-function filterResponses(){
-  const search=(document.getElementById('search-resp')?.value||'').toLowerCase().trim();
-  const graded=document.getElementById('filter-graded')?.value||'all';
-  const qFilter=document.getElementById('filter-q')?.value||'all';
-  const cards=document.querySelectorAll('#resp-list-container .resp-item');
-  let visible=0;
-  cards.forEach(card=>{
-    const name=card.dataset.name||'';
-    const email=card.dataset.email||'';
-    const cardGraded=card.dataset.graded||'pending';
-    const cardQid=card.dataset.qid||'';
-    const matchSearch=!search||(name.includes(search)||email.includes(search));
-    const matchGraded=graded==='all'||cardGraded===graded;
-    const matchQ=qFilter==='all'||cardQid===qFilter;
-    const show=matchSearch&&matchGraded&&matchQ;
-    card.style.display=show?'':'none';
-    if(show)visible++;
+async function _goRespPage(page){
+  _respPage=page;
+  await _loadResponses();
+}
+
+function _changeRespFilter(key,val){
+  _respFilters[key]=val;
+  _respPage=0;
+  _loadResponses();
+}
+
+function _filterRespTable(search){
+  _respFilters.search=search;
+  const term=search.toLowerCase();
+  document.querySelectorAll('.resp-item').forEach(el=>{
+    const name=el.dataset.name||'';
+    const email=el.dataset.email||'';
+    el.style.display=(!term||name.includes(term)||email.includes(term))?'':'none';
   });
-  // Afficher compteur
-  const sub=document.querySelector('.pg-sub');
-  if(sub&&search) sub.textContent=visible+' résultat'+(visible>1?'s':'')+' trouvé'+(visible>1?'s':'');
 }
 
-async function delResp(id){
-  if(!confirm('Supprimer cette réponse ?'))return;
-  await SB.from('responses').delete().eq('id',id);
-  renderResponses();toast('Réponse supprimée.');
-}
 
 async function viewResponses(qid){
   openModal('modal-resp');
@@ -2372,6 +2461,7 @@ function renderSettings(){
       </div>
       <button class="btn btn-sm btn-primary" onclick="saveEmailJSSettings()">&#128190; Enregistrer les cl&#233;s</button>
       <div id="emailjs-settings-status" style="font-size:12px;margin-top:.5rem;color:var(--green-text)"></div>
+      <div style="margin-top:1rem;padding-top:1rem;border-top:.5px solid var(--border)"><label class="flabel">&#128276; Email admin pour notifications</label><div style="display:flex;gap:8px;margin-top:4px"><input type="email" id="gs-admin-email" placeholder="admin@exemple.com" style="flex:1"><button class="btn btn-sm btn-primary" onclick="saveAdminEmail()">Enregistrer</button></div><div style="font-size:11px;color:var(--text3);margin-top:4px">Email envoy&#233; &#224; chaque nouvelle soumission.</div></div>
     </div>
     <div class="card"><div class="sec-title">Export</div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
@@ -2555,6 +2645,7 @@ function _renderRContent(q,qs,isGroup,requireSig,refHtml,descHtml){
   setTimeout(()=>{
     restoreProgress(curQ.id);
     setTimeout(updateProgress,300);
+    initOfflineDetector();
     // Sauvegarde auto toutes les 15 secondes
     clearInterval(window._autoSave);
     window._autoSave = setInterval(()=>saveProgress(curQ.id), 15000);
@@ -2765,6 +2856,14 @@ async function submitR(){
   });
   const pct=totalPts>0?Math.round(earned/totalPts*100):0;
 
+  // Mode hors-ligne : sauvegarder localement si pas de connexion
+  if(!navigator.onLine){
+    const offlinePayload={id:newId,questionnaire_id:curQ.id,respondent_name:curQ.group_mode&&groupName?groupName:name,respondent_email:respondentEmail,group_name:curQ.group_mode?groupName:null,group_members:groupMembers,answers:rAns,signature:sigData||null,final_score:pending===0?earned:null,total_points:totalPts,score_pct:pending===0?pct:null,graded:pending===0,comments:{},manual_scores:{}};
+    await saveOfflineResponse(offlinePayload);
+    clearProgress(curQ.id);clearInterval(window._autoSave);clearInterval(timerInterval);localStorage.removeItem('evalpro_timer_'+curQ.id);
+    document.getElementById('r-content').innerHTML='<div style="text-align:center;padding:2rem"><div style="font-size:48px">&#9889;</div><div style="font-size:16px;font-weight:600;margin:.5rem 0">Réponses sauvegardées hors-ligne</div><div style="font-size:13px;color:var(--text2)">Vos réponses seront envoyées automatiquement dès la reconnexion.</div><button class="btn" onclick="goHome()" style="margin-top:1.5rem">&#8592; Retour</button></div>';
+    return;
+  }
   const{error}=await SB.from('responses').insert({
     id:newId,questionnaire_id:curQ.id,
     respondent_name:curQ.group_mode&&groupName?groupName:name,
@@ -2833,6 +2932,8 @@ async function submitR(){
   parts.push('</div></div>');
   document.getElementById('r-content').innerHTML=parts.join('');
   window._lastSigData=sigData;
+  // Notifier l'admin par email (silencieux)
+  notifyAdminNewResponse(curQ.title, name, respondentEmail, pending===0?{earned,totalPts,pct}:null).catch(()=>{});
 }
 
 
@@ -3714,8 +3815,23 @@ function initRealtime() {
       };
       addNotification(notif);
       showNotifPop(notif);
-      // Mettre à jour les badges dans la sidebar
       updateBadges();
+      // Email à l'admin si EmailJS configuré
+      if(_gjsService && _gjsTemplate && _gjsKey && currentUser && currentUser.email){
+        try{
+          emailjs.init(_gjsKey);
+          emailjs.send(_gjsService, _gjsTemplate, {
+            to_email: currentUser.email,
+            to_name: currentUser.name || 'Administrateur',
+            subject: 'Nouvelle réponse : ' + notif.qTitle,
+            message: notif.name + ' (' + notif.email + ') a soumis une réponse à "' + notif.qTitle + '".',
+            respondent_name: notif.name,
+            respondent_email: notif.email,
+            questionnaire_title: notif.qTitle,
+            reset_link: window.location.origin + window.location.pathname + '?q=' + notif.qId
+          });
+        }catch(e){ console.warn('Email admin notif error:', e); }
+      }
     })
     .subscribe((status) => {
       const indicator = document.getElementById('rt-indicator');
@@ -4836,6 +4952,212 @@ function compressAndLoad(file,maxWidth,quality,callback){
   reader.readAsDataURL(file);
 }
 
+// -- IMPORT QUESTIONS --
+async function importQuestionsFile(input){
+  const file=input.files[0];
+  if(!file) return;
+  input.value='';
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){
+    const text=await file.text();
+    _parseImportCSV(text);
+  } else if(ext==='xlsx'||ext==='xls'){
+    if(typeof XLSX==='undefined'){toast('SheetJS non chargé. Rechargez la page.','error');return;}
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    _parseImportRows(rows);
+  } else {
+    toast('Format non supporté. Utilisez CSV ou XLSX.','error');
+  }
+}
+
+function _parseImportCSV(text){
+  // Détecter le séparateur (virgule ou point-virgule)
+  const sep=text.includes(';')?';':',';
+  const rows=text.split('\n').map(l=>l.split(sep).map(v=>v.replace(/^"|"$/g,'').trim()));
+  _parseImportRows(rows);
+}
+
+function _parseImportRows(rows){
+  if(!rows||rows.length<2){toast('Fichier vide ou invalide.','error');return;}
+  // Format attendu : Question | Type | Option1 | Option2 | ... | BonneRéponse | Points
+  // La 1ère ligne peut être un en-tête — on la détecte
+  const header=rows[0].map(h=>(h||'').toLowerCase());
+  const hasHeader=header.some(h=>h.includes('question')||h.includes('type')||h.includes('label'));
+  const dataRows=hasHeader?rows.slice(1):rows;
+  let imported=0, errors=0;
+
+  dataRows.forEach((row,ri)=>{
+    if(!row||!row[0]||!row[0].trim()) return; // ligne vide
+    const label=(row[0]||'').trim();
+    const rawType=(row[1]||'text').toLowerCase().trim();
+    // Mapper les noms de types
+    const typeMap={'texte':'text','text':'text','qcm':'qcm','choix unique':'qcm',
+      'case':'checkbox','cases':'checkbox','checkbox':'checkbox','choix multiple':'checkbox',
+      'echelle':'scale','échelle':'scale','scale':'scale',
+      'oui/non':'yesno','yesno':'yesno','oui non':'yesno',
+      'tableau':'table','table':'table'};
+    const type=typeMap[rawType]||'text';
+    const points=+(row[row.length-1])||1;
+    let q={id:uid(),type,label,required:true,points};
+
+    if(type==='qcm'||type==='checkbox'){
+      // Colonnes 2..N-2 sont les options, N-1 est la bonne réponse
+      const opts=[];
+      for(let i=2;i<row.length-2;i++){if(row[i]&&row[i].trim()) opts.push(row[i].trim());}
+      if(!opts.length) opts.push('Option A','Option B');
+      q.options=opts;
+      const correctRaw=(row[row.length-2]||'').trim();
+      if(type==='qcm'){
+        const ci=opts.findIndex(o=>o.toLowerCase()===correctRaw.toLowerCase());
+        q.correctAnswer=ci>=0?ci:0;
+      } else {
+        const cis=correctRaw.split('/').map(v=>opts.findIndex(o=>o.toLowerCase()===v.trim().toLowerCase())).filter(i=>i>=0);
+        q.correctAnswer=cis;
+      }
+    } else if(type==='yesno'){
+      const ca=(row[2]||'').trim();
+      q.correctAnswer=ca||null;
+    } else if(type==='text'){
+      q.placeholder='';
+      q.correctAnswer=null;
+    } else if(type==='scale'){
+      q.min=1;q.max=5;q.minLabel='';q.maxLabel='';q.correctAnswer=null;
+    }
+    bQs.push(q);
+    imported++;
+  });
+
+  renderBuild();
+  toast(imported+' question'+(imported>1?'s':'')+' importée'+(imported>1?'s':'')+' !');
+  if(errors) toast(errors+' ligne(s) ignorée(s).','error');
+}
+
+// -- RAPPELS ABANDONS --
+function showAbandonedProgress(){
+  openModal('modal-abandon');
+  const el=document.getElementById('abandon-list');
+  el.innerHTML='<div style="text-align:center;padding:1rem;color:var(--text3)">Analyse...</div>';
+  setTimeout(()=>{
+    const ab=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!k.startsWith('evalpro_progress_')) continue;
+      try{
+        const d=JSON.parse(localStorage.getItem(k)||'{}');
+        if(!d.rAns||!Object.keys(d.rAns).length) continue;
+        ab.push({qid:k.replace('evalpro_progress_',''),k,name:(d.members&&d.members[0]&&d.members[0].name)||'',email:(d.members&&d.members[0]&&d.members[0].email)||'',n:Object.keys(d.rAns).length});
+      }catch(e){}
+    }
+    if(!ab.length){el.innerHTML='<div style="text-align:center;padding:2rem;color:var(--text3)">Aucune progression abandonnee.</div>';return;}
+    let h='<div style="font-size:12px;color:var(--text3);padding:.5rem">'+ab.length+' progression(s)</div>';
+    ab.forEach((a,i)=>{h+='<div class="user-row"><div class="user-avatar">'+(i+1)+'</div><div style="flex:1"><div style="font-size:13px;font-weight:600">'+esc(a.name||'Anonyme')+'</div><div style="font-size:11px;color:var(--text3)">'+esc(a.email)+'</div><div style="font-size:11px;color:var(--blue-text)">'+a.n+' reponse(s)</div></div>'+(a.email?'<button class="btn btn-xs btn-primary" onclick="sendReminderEmail('+JSON.stringify(a.email)+','+JSON.stringify(a.name||'')+','+JSON.stringify(a.qid)+')">Rappel</button>':'')+'<button class="btn btn-xs btn-danger" onclick="clearAbandon('+JSON.stringify(a.k)+')">X</button></div>';});
+    el.innerHTML=h;
+  },50);
+}
+function sendReminderEmail(email,name,qid){
+  if(!_gjsService||!_gjsTemplate||!_gjsKey){toast('EmailJS non configure.','error');return;}
+  const link=window.location.origin+window.location.pathname+'?q='+qid;
+  emailjs.init(_gjsKey);
+  emailjs.send(_gjsService,_gjsTemplate,{to_email:email,to_name:name||email,subject:'Rappel evaluation en attente',message:'Vous avez commence une evaluation. Cliquez le lien pour reprendre.',reset_link:link,app_name:'EvalPro',expires_in:'—'}).then(()=>toast('Rappel envoye.')).catch(e=>toast('Erreur: '+(e.text||e.message),'error'));
+}
+function sendAllReminders(){document.querySelectorAll('#abandon-list .btn-primary').forEach(b=>b.click());}
+function clearAbandon(key){if(!confirm('Supprimer ?'))return;localStorage.removeItem(key);showAbandonedProgress();}
+function initOfflineDetector(){
+  const b=document.getElementById('offline-badge');
+  const u=()=>{if(b)b.style.display=navigator.onLine?'none':'inline-block';};
+  u();
+  window.addEventListener('online',()=>{u();toast('Connexion retablie !');});
+  window.addEventListener('offline',()=>{u();toast('Hors-ligne. Sauvegardes locales actives.','error');});
+}
+
+// -- QR CODE --
+function showQRCode(code, title){
+  const url=window.location.origin+window.location.pathname+'?q='+code;
+  document.getElementById('qr-modal-title').textContent=title;
+  document.getElementById('qr-url-display').textContent=url;
+  openModal('modal-qr');
+  setTimeout(()=>{
+    const canvas=document.getElementById('qr-canvas');
+    if(canvas && typeof QRCode !== 'undefined'){
+      QRCode.toCanvas(canvas, url, {width:240,margin:2,color:{dark:'#1a1a2e',light:'#ffffff'}}, function(err){
+        if(err) console.warn('QR error:',err);
+      });
+    }
+  },100);
+}
+
+function downloadQR(){
+  const canvas=document.getElementById('qr-canvas');
+  if(!canvas) return;
+  const a=document.createElement('a');
+  a.href=canvas.toDataURL('image/png');
+  const title=document.getElementById('qr-modal-title')?.textContent||'qrcode';
+  a.download='QRCode_'+title.replace(/\s+/g,'_').slice(0,30)+'.png';
+  a.click();
+}
+
+function printQR(){
+  const canvas=document.getElementById('qr-canvas');
+  if(!canvas) return;
+  const title=document.getElementById('qr-modal-title')?.textContent||'';
+  const url=document.getElementById('qr-url-display')?.textContent||'';
+  const w=window.open('','_blank');
+  w.document.write('<html><body style="text-align:center;font-family:sans-serif;padding:2rem">');
+  w.document.write('<h2>'+title+'</h2>');
+  w.document.write('<img src="'+canvas.toDataURL()+'" style="width:280px">');
+  w.document.write('<p style="font-size:12px;color:#666;margin-top:1rem">'+url+'</p>');
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
+}
+
+// ─── EMAIL NOTIFICATION ADMIN ────────────────────────
+async function notifyAdminNewResponse(qTitle, respondentName, respondentEmail, scoreInfo){
+  if(!_gjsService||!_gjsTemplate||!_gjsKey) return; // EmailJS non configuré
+  // Récupérer l'email admin depuis app_settings
+  try{
+    const {data}=await SB.from('app_settings').select('value').eq('key','admin_notify_email').single();
+    if(!data||!data.value) return;
+    const adminEmail=data.value.trim();
+    if(!adminEmail||!adminEmail.includes('@')) return;
+    emailjs.init(_gjsKey);
+    const score=scoreInfo?scoreInfo.earned+'/'+scoreInfo.totalPts+' ('+scoreInfo.pct+'%)':'En attente de correction';
+    await emailjs.send(_gjsService,'template_admin_notif',{
+      to_email:adminEmail,
+      to_name:'Administrateur',
+      questionnaire_title:qTitle||'',
+      respondent_name:respondentName||'',
+      respondent_email:respondentEmail||'',
+      score,
+      app_name:'EvalPro'
+    }).catch(()=>{
+      // Fallback : utiliser le même template que reset
+      emailjs.send(_gjsService,_gjsTemplate,{
+        to_email:adminEmail,
+        to_name:'Administrateur EvalPro',
+        reset_link:'',
+        app_name:'EvalPro',
+        expires_in:'',
+        subject:'Nouvelle réponse EvalPro',
+        message:'Nouvelle réponse de '+respondentName+' ('+respondentEmail+') pour "'+qTitle+'". Score: '+score
+      });
+    });
+  }catch(e){/* silencieux */}
+}
+
+
+// OFFLINE MODE
+const OFFLINE_DB="evalpro_offline",OFFLINE_STORE="pending_responses";
+async function openOfflineDB(){return new Promise((res,rej)=>{const req=indexedDB.open(OFFLINE_DB,1);req.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains(OFFLINE_STORE))db.createObjectStore(OFFLINE_STORE,{keyPath:"id"});};req.onsuccess=e=>res(e.target.result);req.onerror=e=>rej(e.target.error);});}
+async function saveOfflineResponse(payload){try{const db=await openOfflineDB();return new Promise((res,rej)=>{const tx=db.transaction(OFFLINE_STORE,"readwrite");tx.objectStore(OFFLINE_STORE).put({...payload,_savedAt:Date.now()});tx.oncomplete=()=>res(true);tx.onerror=e=>rej(e.target.error);});}catch(e){return false;}}
+async function getPendingOfflineResponses(){try{const db=await openOfflineDB();return new Promise((res,rej)=>{const req=db.transaction(OFFLINE_STORE,"readonly").objectStore(OFFLINE_STORE).getAll();req.onsuccess=e=>res(e.target.result||[]);req.onerror=e=>rej(e.target.error);});}catch(e){return[];}}
+async function deleteOfflineResponse(id){try{const db=await openOfflineDB();return new Promise(res=>{const tx=db.transaction(OFFLINE_STORE,"readwrite");tx.objectStore(OFFLINE_STORE).delete(id);tx.oncomplete=()=>res(true);});}catch(e){return false;}}
+async function syncOfflineResponses(){if(!navigator.onLine||!SB)return;const pending=await getPendingOfflineResponses();if(!pending.length)return;let synced=0;for(const item of pending){try{const{_savedAt,...payload}=item;const{error}=await SB.from("responses").insert(payload);if(!error){await deleteOfflineResponse(item.id);synced++;}}catch(e){}}if(synced>0){toast(synced+" reponse(s) synchronisee(s).","info");initRealtime();}}
+function initOfflineMode(){const upd=()=>{const off=!navigator.onLine;const b=document.getElementById("offline-banner");const ind=document.getElementById("offline-indicator");if(b)b.style.display=off?"block":"none";if(ind)ind.style.display=off?"flex":"none";};window.addEventListener("online",()=>{upd();syncOfflineResponses();});window.addEventListener("offline",upd);upd();}
+
 function initDarkMode(){
   const saved=localStorage.getItem('evalpro_theme');
   if(saved==='dark'){
@@ -4993,6 +5315,26 @@ init();
     </div>
   </div>
 </div>
+
+<!-- MODAL: QR Code -->
+<div class="modal-overlay" id="modal-qr">
+  <div class="modal" style="max-width:380px;text-align:center">
+    <div class="mhdr">
+      <div><div class="mtitle">&#127381; QR Code</div><div class="msub" id="qr-modal-title"></div></div>
+      <button class="close-btn" onclick="closeModal('modal-qr')">&#10005;</button>
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:1.5rem;margin:.5rem 0;display:inline-block">
+      <canvas id="qr-canvas"></canvas>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin:.5rem 0" id="qr-url-display"></div>
+    <div class="mactions" style="justify-content:center;margin-top:.75rem">
+      <button class="btn btn-sm" onclick="downloadQR()">&#11015; T&#233;l&#233;charger PNG</button>
+      <button class="btn btn-sm" onclick="printQR()">&#128438; Imprimer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-abandon"><div class="modal" style="max-width:540px"><div class="mhdr"><div><div class="mtitle">&#9203; Progressions</div><div class="msub">Abandonnees sans soumission</div></div><button class="close-btn" onclick="closeModal('modal-abandon')">&#10005;</button></div><div id="abandon-list" style="max-height:340px;overflow-y:auto"></div><div class="mactions"><button class="btn" onclick="closeModal('modal-abandon')">Fermer</button><button class="btn btn-primary" onclick="sendAllReminders()">&#128140; Rappels</button></div></div></div>
 
 </body>
 </html>
