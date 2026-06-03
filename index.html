@@ -82,6 +82,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .stat-val{font-size:26px;font-weight:600;line-height:1}
 .stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
 /* table */
+.dtbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.dtbl-wrap .dtbl{min-width:560px}
 .dtbl{width:100%;border-collapse:collapse;font-size:13px}
 .dtbl th{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;padding:8px 12px;text-align:left;border-bottom:.5px solid var(--border2)}
 .dtbl td{padding:11px 12px;border-bottom:.5px solid var(--border);vertical-align:middle}
@@ -287,6 +289,26 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
   .modal-xl{max-width:100%;margin:.5rem}
   .modal{padding:1.25rem}
   .data-table th,.data-table td{padding:8px}
+}
+@media(max-width:640px){.dtbl-hide-m{display:none !important}.dtbl-row-q,.dtbl-row-r{display:none !important}.q-card-m,.resp-card-m{display:block !important}}
+@media(min-width:641px){.q-card-m,.resp-card-m{display:none !important}}
+.q-card-m{display:none;background:var(--bg);border:.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.q-card-m-title{font-size:14px;font-weight:600;margin-bottom:3px}
+.q-card-m-meta{font-size:11px;color:var(--text3);margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.q-card-m-actions{display:flex;gap:5px;flex-wrap:wrap}
+.resp-card-m{display:none;background:var(--bg);border:.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.resp-card-m-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.resp-card-m-meta{font-size:11px;color:var(--text3);margin-bottom:6px}
+.resp-card-m-score{font-size:13px;font-weight:700}
+.resp-card-m-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+@media(max-width:480px){
+.dtbl-responsive thead{display:none}
+.dtbl-responsive tr{display:block;border:.5px solid var(--border);border-radius:10px;margin-bottom:10px;background:var(--bg)}
+.dtbl-responsive td{display:flex;align-items:flex-start;padding:7px 12px;font-size:12px;border:none;border-bottom:.5px solid var(--border2);gap:10px}
+.dtbl-responsive td:last-child{border-bottom:none}
+.dtbl-responsive td:before{content:attr(data-label);font-weight:600;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;min-width:72px;flex-shrink:0}
+.dtbl-responsive{min-width:unset !important}
+.dtbl td.hide-sm,.dtbl th.hide-sm{display:none}
 }
 @media(max-width:480px){
   .frow2,.frow3{grid-template-columns:1fr}
@@ -1041,9 +1063,9 @@ async function renderQuestionnaires(){
   document.getElementById('content').innerHTML=`
     <div class="pg-title">Questionnaires</div><div class="pg-sub">Créez, gérez et partagez vos questionnaires d&#39;évaluation.</div>
     ${!(qs||[]).length?`<div class="card"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Aucun questionnaire</div><div class="empty-sub">Créez votre premier questionnaire.</div><br><button class="btn btn-primary" onclick="openQModal()">+ Créer un questionnaire</button></div></div>`
-    :`<div class="card" style="padding:0"><table class="dtbl"><thead><tr><th>Titre</th><th>Type</th><th>Questions</th><th>Réponses</th><th>Créé le</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
+    :`<div class="card" style="padding:0"><div class="dtbl-wrap"><table class="dtbl dtbl-responsive"><thead><tr><th>Titre</th><th>Type</th><th>Questions</th><th class="hide-sm">Réponses</th><th class="hide-sm">Créé le</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
     ${(qs||[]).map(q=>{const qrs=(rs||[]).filter(r=>r.questionnaire_id===q.id).length;return`<tr>
-      <td><div style="font-weight:500;font-size:13px">${esc(q.title)}</div>${q.description?`<div style="font-size:11px;color:var(--text3)">${esc(q.description.slice(0,60))}${q.description.length>60?'...':''}</div>`:''}</td>
+      <td data-label="Titre"><div style="font-weight:500;font-size:13px">${esc(q.title)}</div>${q.description?`<div style="font-size:11px;color:var(--text3)">${esc(q.description.slice(0,60))}${q.description.length>60?'...':''}</div>`:''}</td>
       <td><span class="badge ${TC[q.type]||'bg-gray'}">${TL[q.type]||q.type}</span></td>
       <td>${(q.questions||[]).length}</td>
       <td><button class="btn btn-xs" onclick="viewResponses('${q.id}')">${qrs}</button></td>
@@ -2009,7 +2031,7 @@ function _buildResponsesHTML(rs,qs,total,totalPages){
       const men=pct!=null?getMention(pct):null;
       const qid=r.questionnaire_id;
       html+=`<div class="resp-item" data-name="${esc((r.respondent_name||'').toLowerCase())}" data-email="${esc((r.respondent_email||'').toLowerCase())}">
-        <div class="dtbl-wrap"><table class="dtbl" style="width:100%"><thead><tr>
+        <div class="dtbl-wrap"><table class="dtbl dtbl-responsive" style="width:100%"><thead><tr>
           <th style="width:28%">Répondant</th><th style="width:22%">Questionnaire</th>
           <th style="width:14%">Date</th><th style="width:12%">Note</th>
           <th style="width:10%">Statut</th><th>Actions</th>
