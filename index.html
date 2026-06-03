@@ -200,6 +200,7 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
 /* Dark mode overrides pour les couleurs hardcodées */
 [data-theme="dark"] body{background:var(--bg2)}
 [data-theme="dark"] #sidebar{background:var(--bg);border-color:var(--border)}
+[data-theme="dark"] #mobile-topbar,[data-theme="dark"] #bottom-nav{background:var(--bg);border-color:var(--border)}
 [data-theme="dark"] #topbar{background:var(--bg);border-color:var(--border)}
 [data-theme="dark"] .card{background:var(--bg);border-color:var(--border)}
 [data-theme="dark"] .modal{background:var(--bg)}
@@ -250,7 +251,29 @@ pre{background:var(--bg3);border-radius:var(--r);padding:1rem;font-size:11.5px;f
 .dark-toggle:hover{background:var(--bg2);color:var(--text)}
 
 @media(max-width:768px){
-  #sidebar{display:none}#main{margin-left:0}
+  /* === MOBILE NAVIGATION === */
+  #sidebar{display:flex;position:fixed;top:0;left:0;bottom:0;width:280px;transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);z-index:300}
+  #sidebar.mobile-open{transform:translateX(0);box-shadow:4px 0 24px rgba(0,0,0,.3)}
+  #main{margin-left:0}
+  #topbar{display:none}
+  #mobile-topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border-bottom:.5px solid var(--border);position:sticky;top:0;z-index:100}
+  #hamburger{background:none;border:none;cursor:pointer;padding:7px;border-radius:8px;display:flex;flex-direction:column;justify-content:center;gap:5px;transition:background .2s;flex-shrink:0}
+  #hamburger:hover{background:var(--bg2)}
+  #hamburger span{display:block;width:20px;height:2px;background:var(--text);border-radius:2px;transition:transform .25s,opacity .25s}
+  #hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+  #hamburger.open span:nth-child(2){opacity:0}
+  #hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+  #mobile-page-title{font-size:14px;font-weight:600;flex:1;color:var(--text)}
+  #mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:299;backdrop-filter:blur(2px)}
+  #mobile-overlay.visible{display:block}
+  #bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:.5px solid var(--border);z-index:200;padding:4px 0;box-shadow:0 -2px 16px rgba(0,0,0,.1)}
+  .bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;border:none;background:none;font-size:10px;color:var(--text3);cursor:pointer;font-family:inherit;transition:color .15s;position:relative}
+  .bnav-btn .bi{font-size:20px;line-height:1;transition:transform .15s}
+  .bnav-btn.active{color:#8b5cf6}
+  .bnav-btn.active .bi{transform:scale(1.15)}
+  .bnav-btn:active .bi{transform:scale(0.9)}
+  .bnav-dot{position:absolute;top:3px;right:calc(50% - 14px);width:8px;height:8px;background:#ef4444;border-radius:99px;border:2px solid var(--bg);display:none}
+  #content{padding-bottom:72px !important}
   .frow2,.frow3{grid-template-columns:1fr}
   .stats-grid{grid-template-columns:1fr 1fr}
   .r-content{padding:1rem .75rem 4rem}
@@ -544,6 +567,21 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
 
 <!-- ADMIN APP -->
 <div id="admin-app" style="display:none">
+  <!-- Overlay sidebar mobile -->
+  <div id="mobile-overlay" onclick="closeSidebar()"></div>
+  <!-- Topbar mobile -->
+  <div id="mobile-topbar">
+    <button id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div id="mobile-page-title">Tableau de bord</div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div id="rt-indicator-mobile" class="realtime-indicator" style="display:none"><div class="realtime-dot"></div></div>
+      <button class="notif-bell" onclick="toggleNotifPanel()" style="padding:6px">
+        &#128276;<span class="notif-badge" id="notif-badge-mobile"></span>
+      </button>
+    </div>
+  </div>
   <div id="app">
     <div id="sidebar">
       <div class="sb-logo">
@@ -588,6 +626,23 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     </div>
   </div>
 </div>
+
+  <!-- Bottom navigation mobile -->
+  <nav id="bottom-nav">
+    <button class="bnav-btn active" id="bnav-dashboard" onclick="navigate('dashboard');setBottomNav('dashboard')">
+      <span class="bi">&#128202;</span>Dashboard
+    </button>
+    <button class="bnav-btn" id="bnav-questionnaires" onclick="navigate('questionnaires');setBottomNav('questionnaires')">
+      <span class="bi">&#128203;</span>Questionnaires
+    </button>
+    <button class="bnav-btn" id="bnav-responses" onclick="navigate('responses');setBottomNav('responses')">
+      <span class="bi">&#128229;</span>R&#233;ponses
+      <span class="bnav-dot" id="bnav-dot-responses"></span>
+    </button>
+    <button class="bnav-btn" id="bnav-settings" onclick="navigate('settings');setBottomNav('settings')" data-role-hide="admin">
+      <span class="bi">&#9881;</span>Param&#232;tres
+    </button>
+  </nav>
 
 <!-- RESPONDENT APP -->
 <div id="respondent-app" style="display:none">
@@ -911,6 +966,8 @@ function savePwd(){
 
 // ─── NAVIGATION ───────────────────────────────────────
 function navigate(view){
+  if(typeof isMobile!=="undefined"&&isMobile())closeSidebar();
+  const _t={dashboard:"Tableau de bord",questionnaires:"Questionnaires",responses:"Reponses",settings:"Parametres"};if(typeof updateMobileTitle!=="undefined"){updateMobileTitle(_t[view]||view);setBottomNav(view);}
   ['dashboard','questionnaires','responses','settings'].forEach(v=>{const el=document.getElementById('nav-'+v);if(el)el.className='nav-item'+(v===view?' active':'');});
   ({dashboard:renderDashboard,questionnaires:renderQuestionnaires,responses:renderResponses,settings:renderSettings})[view]?.();
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
@@ -4449,6 +4506,7 @@ function showAdminApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('admin-app').style.display='block';
   applyRoleRestrictions();
+  if(typeof setBottomNav!=="undefined"){setBottomNav("dashboard");updateMobileTitle("Tableau de bord");}
   navigate('dashboard');
   loadSavedNotifs();
   initRealtime();
@@ -5365,6 +5423,12 @@ async function syncOfflineResponses(){if(!navigator.onLine||!SB)return;const pen
 function initOfflineMode(){const upd=()=>{const off=!navigator.onLine;const b=document.getElementById("offline-banner");const ind=document.getElementById("offline-indicator");if(b)b.style.display=off?"block":"none";if(ind)ind.style.display=off?"flex":"none";};window.addEventListener("online",()=>{upd();syncOfflineResponses();});window.addEventListener("offline",upd);upd();}
 
 function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){try{const{jsPDF}=window.jspdf;if(!jsPDF)return null;const doc=new jsPDF({orientation:"l",unit:"mm",format:"a4"});const W=297,H=210;doc.setFillColor(26,26,46);doc.rect(0,0,W,H,"F");doc.setDrawColor(108,99,255);doc.setLineWidth(2);doc.roundedRect(10,10,W-20,H-20,8,8,"S");if(q.logo_url){try{doc.addImage(q.logo_url,"PNG",20,18,32,20);}catch(e){}}doc.setFont("helvetica","bold");doc.setFontSize(36);doc.setTextColor(255,255,255);doc.text((certTitle||"Certificat").toUpperCase(),W/2,52,{align:"center"});doc.setDrawColor(108,99,255);doc.setLineWidth(1);doc.line(W/2-60,57,W/2+60,57);doc.setFont("helvetica","normal");doc.setFontSize(12);doc.setTextColor(160,150,220);doc.text("Decerne a",W/2,70,{align:"center"});doc.setFont("helvetica","bold");doc.setFontSize(26);doc.setTextColor(255,255,255);doc.text(nm,W/2,84,{align:"center"});doc.setFont("helvetica","normal");doc.setFontSize(11);doc.setTextColor(180,170,220);doc.text("pour avoir complete avec succes",W/2,96,{align:"center"});doc.setFont("helvetica","bold");doc.setFontSize(14);doc.setTextColor(220,210,255);const tl=doc.splitTextToSize(q.title,W-80);doc.text(tl,W/2,108,{align:"center"});const sc=pct>=75?[34,197,94]:pct>=50?[234,179,8]:[239,68,68];doc.setFillColor(sc[0],sc[1],sc[2]);doc.roundedRect(W/2-45,H-54,90,20,4,4,"F");doc.setFont("helvetica","bold");doc.setFontSize(13);doc.setTextColor(255,255,255);doc.text(pct+"% - "+mention,W/2,H-40,{align:"center"});doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(120,110,160);doc.text("Delivre le "+new Date().toLocaleDateString("fr-FR"),W/2,H-22,{align:"center"});doc.text("EvalPro",22,H-22);return doc.output("datauristring").split(",")[1];}catch(e){return null;}}
+function toggleSidebar(){const sb=document.getElementById("sidebar");const ov=document.getElementById("mobile-overlay");const hb=document.getElementById("hamburger");const o=sb.classList.contains("mobile-open");sb.classList.toggle("mobile-open",!o);ov.classList.toggle("visible",!o);hb.classList.toggle("open",!o);document.body.style.overflow=o?"":"hidden";}
+function closeSidebar(){document.getElementById("sidebar")?.classList.remove("mobile-open");document.getElementById("mobile-overlay")?.classList.remove("visible");document.getElementById("hamburger")?.classList.remove("open");document.body.style.overflow="";}
+function setBottomNav(v){document.querySelectorAll(".bnav-btn").forEach(b=>b.classList.toggle("active",b.id==="bnav-"+v));}
+function updateMobileTitle(t){const el=document.getElementById("mobile-page-title");if(el)el.textContent=t||"EvalPro";}
+function isMobile(){return window.innerWidth<=768;}
+
 function initDarkMode(){
   const saved=localStorage.getItem('evalpro_theme');
   if(saved==='dark'){
