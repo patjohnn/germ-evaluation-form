@@ -170,10 +170,30 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--te
 .ans-q{color:var(--text2);font-size:12px;margin-bottom:2px}
 .ans-a{font-weight:500}
 /* misc */
-.empty{text-align:center;padding:3rem 1rem;color:var(--text3)}
+.empty{text-align:center;padding:3.5rem 1.5rem;color:var(--text3);animation:fadeIn .4s ease}
+.empty svg{margin:0 auto 1.25rem;display:block;opacity:.5}
 .empty-icon{font-size:32px;margin-bottom:.75rem}
-.empty-title{font-size:15px;font-weight:500;color:var(--text2);margin-bottom:.5rem}
-.empty-sub{font-size:13px;line-height:1.6}
+.empty-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:.5rem}
+.empty-sub{font-size:13px;line-height:1.6;color:var(--text2);max-width:320px;margin:0 auto .25rem}
+/* Accordéon */
+.empty-svg{margin:0 auto 1rem;display:flex;justify-content:center;color:var(--text2)}
+.empty-svg svg{opacity:.55}
+.acc-section{border:.5px solid var(--border);border-radius:var(--rl);margin-bottom:.5rem;overflow:hidden}
+.acc-header{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1rem;cursor:pointer;user-select:none;background:var(--bg2);transition:background .15s;gap:10px;border:none;width:100%;text-align:left;font-family:inherit}
+.acc-header:hover{background:var(--bg3)}
+.acc-title{font-size:13px;font-weight:600;color:var(--text)}
+.acc-chevron{font-size:10px;color:var(--text3);transition:transform .25s;flex-shrink:0}
+.acc-header[aria-expanded="true"] .acc-chevron{transform:rotate(180deg)}
+.acc-body{padding:1rem;background:var(--bg);animation:fadeIn .18s ease}
+.acc-header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1rem;cursor:pointer;user-select:none;background:var(--bg2);transition:background .15s}
+.acc-header:hover{background:var(--bg3)}
+.acc-title{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+.acc-chevron{font-size:11px;color:var(--text3);transition:transform .25s}
+.acc-header[aria-expanded='true'] .acc-chevron{transform:rotate(180deg)}
+.acc-badge{font-size:10px;font-weight:600;background:var(--purple-bg,#ede9fe);color:var(--purple-text,#7c3aed);padding:1px 6px;border-radius:99px}
+.acc-body{padding:1rem;display:none;border-top:.5px solid var(--border);animation:fadeIn .2s ease}
+.acc-header[aria-expanded='true'] + .acc-body{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .copy-link{display:flex;align-items:center;background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--r);padding:8px 12px;font-size:12px;font-family:monospace;color:var(--text2);word-break:break-all;flex:1}
 /* spinner */
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--text);border-radius:50%;animation:spin .6s linear infinite}
@@ -747,8 +767,14 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     </div>
     <div class="fgroup"><label class="flabel">Description / consignes</label><textarea id="q-desc" rows="2" placeholder="Instructions pour les répondants..."></textarea></div>
     <div class="fgroup"><label class="flabel">Texte de référence (affiché en lecture seule aux répondants)</label><textarea id="q-ref" rows="4" placeholder="Collez ici le texte de l'étude de cas ou le document à analyser..."></textarea></div>
-    <div style="background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:1rem;margin-bottom:1rem">
-      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:.75rem">&#127912; Identité visuelle <span style="font-weight:400;color:var(--text3)">(optionnel)</span></div>
+    <div class="acc-section">
+      <button class="acc-header" aria-expanded="false" onclick="toggleAcc(this)">
+        <div class="acc-title">&#127912; Identité visuelle <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px">couleur, logo</span></div>
+        <span class="acc-chevron">&#9660;</span>
+      </button>
+      <div class="acc-body" style="display:none">
+    <div style="background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:1rem;margin-bottom:0">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:.75rem">&#127912; Identité visuelle</div>
       <div class="frow3">
         <div class="fgroup" style="margin-bottom:0">
           <label class="flabel">Couleur principale</label>
@@ -770,8 +796,17 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
         <img id="q-logo-img" style="max-height:60px;max-width:200px;border-radius:6px;border:.5px solid var(--border)">
       </div>
     </div>
-    <div style="background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:1rem;margin-bottom:1rem">
-      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:.75rem">&#128197; Planification de l&#39;évaluation <span style="font-weight:400;color:var(--text3)">(optionnel — laissez vide pour accès permanent)</span></div>
+      </div><!-- end acc-body IV -->
+    </div><!-- end acc-section IV -->
+
+    <div class="acc-section">
+      <button class="acc-header" aria-expanded="false" onclick="toggleAcc(this)">
+        <div class="acc-title">&#128197; Planification <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px">date début · date fin</span></div>
+        <span class="acc-chevron">&#9660;</span>
+      </button>
+      <div class="acc-body" style="display:none">
+    <div style="background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:1rem;margin-bottom:0">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:.75rem">&#128197; Planification de l&#39;évaluation</div>
       <div class="frow2">
         <div class="fgroup" style="margin-bottom:0">
           <label class="flabel">&#9654; Date et heure de début</label>
@@ -783,6 +818,15 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
         </div>
       </div>
     </div>
+      </div><!-- end acc-body PL -->
+    </div><!-- end acc-section PL -->
+
+    <div class="acc-section">
+      <button class="acc-header" aria-expanded="false" onclick="toggleAcc(this)">
+        <div class="acc-title">&#9881;&#65039; Options <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px">soumissions, groupe, signature, certificat, durée</span></div>
+        <span class="acc-chevron">&#9660;</span>
+      </button>
+      <div class="acc-body" style="display:none">
     <div class="frow3" style="margin-bottom:1rem">
       <div class="fgroup" style="margin-bottom:0"><label class="flabel">Soumissions autorisées</label>
         <select id="q-max-attempts"><option value="1">1 fois</option><option value="2">2 fois</option><option value="0">Illimité</option></select>
@@ -812,8 +856,17 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       </div>
     </div>
 
+      </div><!-- end acc-body OPT -->
+    </div><!-- end acc-section OPT -->
+
+    <div class="acc-section">
+      <button class="acc-header" aria-expanded="false" onclick="toggleAcc(this)">
+        <div class="acc-title">&#128140; Notifications email <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:4px">envoi PDF automatique via EmailJS</span></div>
+        <span class="acc-chevron">&#9660;</span>
+      </button>
+      <div class="acc-body" style="display:none">
     <div class="fgroup" style="margin-bottom:1rem">
-      <label class="flabel">EmailJS — envoi PDF automatique <span style="font-weight:400;color:var(--text3)">(optionnel, emailjs.com gratuit)</span></label>
+      <label class="flabel">EmailJS — envoi PDF automatique</label>
       <div class="frow3">
         <input type="text" id="q-emailjs-service" placeholder="Service ID (service_xxx)">
         <input type="text" id="q-emailjs-template" placeholder="Template ID (template_xxx)">
@@ -834,6 +887,9 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     </div>
     <div id="q-builder" style="max-height:320px;overflow-y:auto;padding-right:4px"></div>
     <div id="builder-empty" style="text-align:center;padding:1.25rem;color:var(--text3);font-size:13px;background:var(--bg2);border-radius:var(--r)">Ajoutez des questions via les boutons ci-dessus.</div>
+      </div><!-- end acc-body EJS -->
+    </div><!-- end acc-section EJS -->
+
     <div class="mactions">
       <button class="btn" onclick="closeModal('modal-q')">Annuler</button>
       <button class="btn btn-primary" id="save-q-btn" onclick="saveQuestionnaire()">💾 Enregistrer</button>
@@ -1040,7 +1096,7 @@ async function renderDashboard(){
         <div class="sec-title" style="margin-bottom:0">Questionnaires récents</div>
         <button class="btn btn-sm" onclick="navigate('questionnaires')">Voir tous →</button>
       </div>
-      ${!(qs||[]).length?`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Aucun questionnaire</div><div class="empty-sub">Créez votre premier questionnaire pour commencer.</div><br><button class="btn btn-primary" onclick="openQModal()">+ Créer</button></div>`
+      ${!(qs||[]).length?`<div class="empty"><div class="empty-svg" style="color:var(--text2)"><svg width="100" height="80" viewBox="0 0 100 80" fill="none"><rect x="10" y="6" width="80" height="68" rx="8" fill="currentColor" fill-opacity=".07" stroke="currentColor" stroke-opacity=".2" stroke-width="1.5"/><rect x="22" y="20" width="35" height="5" rx="2.5" fill="currentColor" fill-opacity=".3"/><rect x="22" y="32" width="56" height="4" rx="2" fill="currentColor" fill-opacity=".15"/><rect x="22" y="42" width="44" height="4" rx="2" fill="currentColor" fill-opacity=".15"/></svg><div class="empty-title">Aucun questionnaire</div><div class="empty-sub">Créez votre premier questionnaire pour commencer.</div><br><button class="btn btn-primary" onclick="openQModal()">+ Créer</button></div>`
       :`<table class="dtbl"><thead><tr><th>Titre</th><th>Type</th><th>Réponses</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
       ${(qs||[]).slice(0,5).map(q=>{const qrs=(rs||[]).filter(r=>r.questionnaire_id===q.id).length;return`<tr>
         <td><strong style="font-size:13px">${esc(q.title)}</strong><br><span style="font-size:11px;color:var(--text3)">${fmt(q.created_at)}</span></td>
@@ -1062,7 +1118,7 @@ async function renderQuestionnaires(){
   updateBadges();
   document.getElementById('content').innerHTML=`
     <div class="pg-title">Questionnaires</div><div class="pg-sub">Créez, gérez et partagez vos questionnaires d&#39;évaluation.</div>
-    ${!(qs||[]).length?`<div class="card"><div class="empty"><div class="empty-icon">📋</div><div class="empty-title">Aucun questionnaire</div><div class="empty-sub">Créez votre premier questionnaire.</div><br><button class="btn btn-primary" onclick="openQModal()">+ Créer un questionnaire</button></div></div>`
+    ${!(qs||[]).length?`<div class="card"><div class="empty"><div class="empty-svg" style="color:var(--text2)"><svg width="100" height="80" viewBox="0 0 100 80" fill="none"><rect x="10" y="6" width="80" height="68" rx="8" fill="currentColor" fill-opacity=".07" stroke="currentColor" stroke-opacity=".2" stroke-width="1.5"/><rect x="22" y="20" width="35" height="5" rx="2.5" fill="currentColor" fill-opacity=".3"/><rect x="22" y="32" width="56" height="4" rx="2" fill="currentColor" fill-opacity=".15"/><rect x="22" y="42" width="44" height="4" rx="2" fill="currentColor" fill-opacity=".15"/></svg><div class="empty-title">Aucun questionnaire</div><div class="empty-sub">Créez votre premier questionnaire.</div><br><button class="btn btn-primary" onclick="openQModal()">+ Créer un questionnaire</button></div></div>`
     :`<div class="card" style="padding:0"><div class="dtbl-wrap"><table class="dtbl dtbl-responsive"><thead><tr><th>Titre</th><th>Type</th><th>Questions</th><th class="hide-sm">Réponses</th><th class="hide-sm">Créé le</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
     ${(qs||[]).map(q=>{const qrs=(rs||[]).filter(r=>r.questionnaire_id===q.id).length;return`<tr>
       <td data-label="Titre"><div style="font-weight:500;font-size:13px">${esc(q.title)}</div>${q.description?`<div style="font-size:11px;color:var(--text3)">${esc(q.description.slice(0,60))}${q.description.length>60?'...':''}</div>`:''}</td>
@@ -1324,6 +1380,13 @@ function copyLink(){
 let eQId=null, bQs=[];
 const BTBC={text:'bg-gray',qcm:'bg-amber',checkbox:'bg-purple',scale:'bg-blue',table:'bg-teal',yesno:'bg-green'};
 const BTL={text:'Texte libre',qcm:'QCM',checkbox:'Cases à cocher',scale:'Échelle',table:'Tableau',yesno:'Oui/Non'};
+
+function toggleAcc(btn){
+  const open=btn.getAttribute("aria-expanded")==="true";
+  btn.setAttribute("aria-expanded",open?"false":"true");
+  const body=btn.nextElementSibling;
+  if(body)body.style.display=open?"none":"block";
+}
 
 function openQModal(qid){
   eQId=qid||null;bQs=[];
@@ -2012,7 +2075,7 @@ function _buildResponsesHTML(rs,qs,total,totalPages){
   </div>`;
 
   if(!rs.length){
-    html+=`<div class="card" style="text-align:center;padding:2rem;color:var(--text3)">Aucune réponse trouvée.</div>`;
+    html+=`<div class="card"><div class="empty" style="color:var(--text2)"><svg width="100" height="80" viewBox="0 0 100 80" fill="none"><rect x="6" y="12" width="60" height="48" rx="6" fill="currentColor" fill-opacity=".07" stroke="currentColor" stroke-opacity=".2" stroke-width="1.5"/><rect x="16" y="24" width="32" height="4" rx="2" fill="currentColor" fill-opacity=".25"/><rect x="16" y="34" width="42" height="3" rx="1.5" fill="currentColor" fill-opacity=".12"/><circle cx="76" cy="56" r="12" fill="currentColor" fill-opacity=".06" stroke="currentColor" stroke-opacity=".2" stroke-width="1.5"/></svg><div class="empty-title">Aucune réponse</div><div class="empty-sub">Partagez votre questionnaire pour recevoir des réponses.</div></div></div>`;
   } else {
     html+=`<div id="resp-table">`;
     rs.forEach(r=>{
@@ -2234,7 +2297,7 @@ async function viewResponses(qid){
   document.getElementById('mr-sub').textContent=(rs||[]).length+' réponse(s) — Total: '+totalPts+' pts';
   document.getElementById('mr-export-btn').onclick=()=>exportQCSV(q,rs||[]);
   if(!(rs||[]).length){
-    document.getElementById('mr-content').innerHTML='<div class="empty" style="padding:2rem"><div class="empty-icon">📥</div><div class="empty-title">Aucune réponse</div></div>';
+    document.getElementById('mr-content').innerHTML='<div class="empty" style="padding:2rem"><div class="empty-svg" style="color:var(--text2)"><svg width="100" height="80" viewBox="0 0 100 80" fill="none"><rect x="6" y="12" width="60" height="48" rx="6" fill="currentColor" fill-opacity=".07" stroke="currentColor" stroke-opacity=".2" stroke-width="1.5"/><rect x="16" y="24" width="32" height="4" rx="2" fill="currentColor" fill-opacity=".25"/><rect x="16" y="34" width="42" height="3" rx="1.5" fill="currentColor" fill-opacity=".12"/><circle cx="76" cy="56" r="12" fill="currentColor" fill-opacity=".06" stroke="currentColor" stroke-opacity=".2" stroke-width="1.5"/></svg><div class="empty-title">Aucune réponse</div></div>';
     return;
   }
   document.getElementById('mr-content').innerHTML=(rs||[]).map(r=>{
