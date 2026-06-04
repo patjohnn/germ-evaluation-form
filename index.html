@@ -5535,7 +5535,7 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     /* Filigrane gauche - symboles nature */
     doc.setFont("helvetica","bold");doc.setTextColor(255,255,255);
     [[6+LW*0.5,22,22],[6+LW*0.2,45,18],[6+LW*0.78,58,16],[6+LW*0.4,80,20],[6+LW*0.15,100,17],[6+LW*0.7,115,19],[6+LW*0.35,140,21],[6+LW*0.65,155,16],[6+LW*0.25,175,18],[6+LW*0.6,192,20]].forEach(function(p,i){
-      doc.setFontSize(p[2]);doc.text(i%2===0?"\u2665":"\u2463",p[0],p[1],{align:"center"});
+      doc.setFontSize(p[2]);doc.text(i%2===0?"o":"*",p[0],p[1],{align:"center"});
     });
 
     /* LOGO */
@@ -5554,11 +5554,6 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     }
 
     /* Separateur vertical blanc */
-    /* Filigrane droite - symboles nature verts */
-    doc.setFont("helvetica","bold");doc.setTextColor(140,200,140);
-    [[XR+12,18,22],[XR+55,14,18],[XR+RW-12,20,20],[XR+28,H-18,19],[XR+70,H-14,17],[XR+RW-20,H-20,21],[XR+RW/2-30,H/2-5,16],[XR+RW/2+25,H/2+18,20],[XR+100,22,18],[XR+RW-50,H-16,17],[XR+15,H/2+30,19],[XR+RW-8,H/2-15,22],[XR+RW/2,H-12,18],[XR+45,H/2-25,16],[XR+RW/2-10,18,20]].forEach(function(p,i){
-      doc.setFontSize(p[2]);doc.text(i%2===0?"\u2665":"\u2463",p[0],p[1],{align:"center"});
-    });
     doc.setDrawColor(255,255,255); doc.setLineWidth(1);
     doc.line(LW+6,12,LW+6,H-12);
 
@@ -5577,6 +5572,13 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     /* ZONE DROITE */
     var XR=LW+18;
     var RW=W-XR-14;
+    /* Filigrane droite apres XR/RW */
+    doc.setFont("helvetica","bold");doc.setTextColor(140,200,140);
+    [[XR+12,18,22],[XR+60,14,18],[XR+RW-15,22,20],[XR+25,H-20,19],[XR+75,H-15,17],
+     [XR+RW-25,H-22,21],[XR+RW/2,H/2+5,16],[XR+105,20,18],[XR+20,H/2+25,19],
+     [XR+RW-10,H/2-10,22],[XR+RW/2+15,18,20]].forEach(function(p,i){
+      doc.setFontSize(p[2]);doc.text(i%2===0?"o":"*",p[0],p[1],{align:"center"});
+    });
 
     /* "CERTIFICAT" grand */
     doc.setFont("helvetica","bold"); doc.setFontSize(34); doc.setTextColor(CR,CG,CB);
