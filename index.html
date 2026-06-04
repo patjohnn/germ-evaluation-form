@@ -3219,14 +3219,6 @@ async function submitR(){
   parts.push('<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">');
   parts.push('<button class="btn" onclick="goHome()" style="border-radius:10px">&#8592; Retour</button>');
   parts.push('<button class="pdf-btn" data-rid="'+newId+'" onclick="downloadResultPDF(this.dataset.rid)">&#128196; Télécharger mon résumé PDF</button>');
-  if(pending===0 && curQ.cert_threshold && pct>=+curQ.cert_threshold){
-    const certB64=generateCertificatePDF(curQ,displayName,earned,pct,m?m.txt:"Reussi",curQ.cert_title||"Certificat");
-    if(certB64){
-      window._lastCertB64=certB64; window._lastCertName=displayName;
-            parts.push('<button onclick="downloadCert()" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px">&#127881; Certificat</button>');
-    }
-  }
-  parts.push('</div></div>');
   document.getElementById('r-content').innerHTML=parts.join('');
   window._lastSigData=sigData;
   // Notifier l'admin par email (silencieux)
@@ -5540,12 +5532,13 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
 
     /* Feuilles zone gauche blanc pur sur fond colore */
     doc.setFillColor(255,255,255);
-    doc.ellipse(6+LW*0.25,H*0.44,9,15,"F");
-    doc.ellipse(6+LW*0.72,H*0.62,7,11,"F");
-    doc.ellipse(6+LW*0.48,H*0.79,11,17,"F");
-    doc.ellipse(6+LW*0.3,H*0.26,8,13,"F");
-    doc.ellipse(6+LW*0.8,H*0.35,6,10,"F");
-    doc.ellipse(6+LW*0.15,H*0.68,7,12,"F");
+    doc.ellipse(6+LW*0.25,H*0.44,14,22,"F");
+    doc.ellipse(6+LW*0.72,H*0.62,12,19,"F");
+    doc.ellipse(6+LW*0.48,H*0.79,15,24,"F");
+    doc.ellipse(6+LW*0.3,H*0.26,13,21,"F");
+    doc.ellipse(6+LW*0.8,H*0.35,11,17,"F");
+    doc.ellipse(6+LW*0.15,H*0.68,12,19,"F");
+    doc.ellipse(6+LW*0.6,H*0.15,10,16,"F");
 
     /* LOGO */
     var LOGO_X=11, LOGO_Y=13, LOGO_W=LW-10, LOGO_H=56;
@@ -5563,9 +5556,9 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     }
 
     /* Separateur vertical blanc */
-    doc.setFillColor(200,230,200);
-    [[200,22,15],[252,78,12],[272,152,10],[182,168,13],[232,128,9],[273,42,11],[177,68,10],[242,102,8],[162,138,12],[197,42,10]].forEach(function(f){doc.circle(f[0],f[1],f[2],"F");});
-    [[212,48,14,5],[182,118,12,5],[258,33,10,4],[232,172,13,5],[272,98,10,4]].forEach(function(l){doc.ellipse(l[0],l[1],l[2],l[3],"F");});
+    doc.setFillColor(140,200,140);
+    [[200,22,22],[252,78,19],[272,152,17],[182,168,19],[232,128,16],[273,42,18],[177,68,17],[242,102,15],[162,138,19],[197,42,17],[225,185,16],[285,115,15]].forEach(function(f){doc.circle(f[0],f[1],f[2],"F");});
+    [[212,48,20,10],[182,118,18,10],[258,33,16,9],[232,172,19,10],[272,98,16,9],[155,45,17,9],[290,140,15,8],[168,160,18,10],[245,155,17,9],[200,70,14,8]].forEach(function(l){doc.ellipse(l[0],l[1],l[2],l[3],"F");});
     doc.setDrawColor(255,255,255); doc.setLineWidth(1);
     doc.line(LW+6,12,LW+6,H-12);
 
