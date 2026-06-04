@@ -2184,8 +2184,9 @@ function buildRespDetailHtml(q,r){
   html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
   if(canCorrect())html+='<button class="btn btn-sm btn-success" data-rid="'+r.id+'" data-qid="'+q.id+'" onclick="saveGrade(this.dataset.rid,this.dataset.qid)">&#128190; Enregistrer</button>';
   html+='<button class="btn btn-sm" onclick="adminDownloadPDF(this.dataset.rid)" data-rid="'+r.id+'">&#128196; PDF</button>';
-  const _cs=q.cert_threshold&&pct>=+q.cert_threshold?'background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none':'background:var(--bg2);color:var(--text);border:.5px solid var(--border2)';
-  html+='<button class="btn btn-sm" style="'+_cs+'" data-rid="'+r.id+'" data-qid="'+q.id+'" onclick="adminGenerateCert(this.dataset.rid,this.dataset.qid)">&#127881; Certificat</button>';
+  if(q.cert_threshold&&pct>=+q.cert_threshold){
+    html+='<button class="btn btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none" data-rid="'+r.id+'" data-qid="'+q.id+'" title="Seuil '+q.cert_threshold+'% atteint" onclick="adminGenerateCert(this.dataset.rid,this.dataset.qid)">&#127881; Certificat</button>';
+  }
   html+='</div></div>';
   (q.questions||[]).forEach((qq,qi)=>{
     const ans=(r.answers||{})[qq.id];
@@ -2263,6 +2264,7 @@ async function adminGenerateCert(rid,qid){
   });
   const pct=totalPts>0?Math.round(earned/totalPts*100):0;
   const name=r.group_name||r.respondent_name||'Repondant';
+  if(!q.cert_threshold||pct<+q.cert_threshold){toast('Seuil non atteint : '+pct+'% / '+q.cert_threshold+'% requis.','error');return;}
   const b64=generateCertificatePDF(q,name,earned,pct,getMention(pct).txt,q.cert_title||'Certificat de reussite');
   if(!b64){toast('Erreur certificat.','error');return;}
   const a=document.createElement('a');
@@ -5530,20 +5532,16 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     doc.rect(6,6,LW,H-12,"F");
 
 
-    /* Feuilles zone gauche blanc pur sur fond colore */
-    doc.setFillColor(255,255,255);
-    doc.ellipse(6+LW*0.25,H*0.44,14,22,"F");
-    doc.ellipse(6+LW*0.72,H*0.62,12,19,"F");
-    doc.ellipse(6+LW*0.48,H*0.79,15,24,"F");
-    doc.ellipse(6+LW*0.3,H*0.26,13,21,"F");
-    doc.ellipse(6+LW*0.8,H*0.35,11,17,"F");
-    doc.ellipse(6+LW*0.15,H*0.68,12,19,"F");
-    doc.ellipse(6+LW*0.6,H*0.15,10,16,"F");
+    /* Filigrane gauche - symboles nature */
+    doc.setFont("helvetica","bold");doc.setTextColor(255,255,255);
+    [[6+LW*0.5,22,22],[6+LW*0.2,45,18],[6+LW*0.78,58,16],[6+LW*0.4,80,20],[6+LW*0.15,100,17],[6+LW*0.7,115,19],[6+LW*0.35,140,21],[6+LW*0.65,155,16],[6+LW*0.25,175,18],[6+LW*0.6,192,20]].forEach(function(p,i){
+      doc.setFontSize(p[2]);doc.text(i%2===0?"\u2665":"\u2463",p[0],p[1],{align:"center"});
+    });
 
     /* LOGO */
-    var LOGO_X=11, LOGO_Y=13, LOGO_W=LW-10, LOGO_H=56;
+    var LOGO_X=Math.round(6+(LW-40)/2), LOGO_Y=24, LOGO_W=40, LOGO_H=34;
     if(q.logo_url){
-      try{ doc.addImage(q.logo_url,"",LOGO_X,LOGO_Y,LOGO_W,LOGO_H,"","NONE"); }
+      try{ try{doc.addImage(q.logo_url,"JPEG",LOGO_X,LOGO_Y,LOGO_W,LOGO_H);}catch(_e){try{doc.addImage(q.logo_url,"PNG",LOGO_X,LOGO_Y,LOGO_W,LOGO_H);}catch(_e2){}} }
       catch(e){
         doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(255,255,255);
         doc.text("GERM SARL",6+LW/2,40,{align:"center",maxWidth:LW-8});
@@ -5556,9 +5554,11 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     }
 
     /* Separateur vertical blanc */
-    doc.setFillColor(140,200,140);
-    [[200,22,22],[252,78,19],[272,152,17],[182,168,19],[232,128,16],[273,42,18],[177,68,17],[242,102,15],[162,138,19],[197,42,17],[225,185,16],[285,115,15]].forEach(function(f){doc.circle(f[0],f[1],f[2],"F");});
-    [[212,48,20,10],[182,118,18,10],[258,33,16,9],[232,172,19,10],[272,98,16,9],[155,45,17,9],[290,140,15,8],[168,160,18,10],[245,155,17,9],[200,70,14,8]].forEach(function(l){doc.ellipse(l[0],l[1],l[2],l[3],"F");});
+    /* Filigrane droite - symboles nature verts */
+    doc.setFont("helvetica","bold");doc.setTextColor(140,200,140);
+    [[XR+12,18,22],[XR+55,14,18],[XR+RW-12,20,20],[XR+28,H-18,19],[XR+70,H-14,17],[XR+RW-20,H-20,21],[XR+RW/2-30,H/2-5,16],[XR+RW/2+25,H/2+18,20],[XR+100,22,18],[XR+RW-50,H-16,17],[XR+15,H/2+30,19],[XR+RW-8,H/2-15,22],[XR+RW/2,H-12,18],[XR+45,H/2-25,16],[XR+RW/2-10,18,20]].forEach(function(p,i){
+      doc.setFontSize(p[2]);doc.text(i%2===0?"\u2665":"\u2463",p[0],p[1],{align:"center"});
+    });
     doc.setDrawColor(255,255,255); doc.setLineWidth(1);
     doc.line(LW+6,12,LW+6,H-12);
 
