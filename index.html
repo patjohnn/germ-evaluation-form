@@ -5528,19 +5528,6 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     var m=hex.replace("#","").match(/.{2}/g)||["6c","63","ff"];
     var CR=parseInt(m[0],16), CG=parseInt(m[1],16), CB=parseInt(m[2],16);
 
-    /* FILIGRANE NATURE - cercles et ellipses tres transparents */
-    var gs=doc.GState({opacity:0.06});
-    doc.setGState(gs);
-    doc.setFillColor(CR,CG,CB);
-    [[220,30,18],[255,85,14],[265,165,10],[185,185,12],[235,142,8],
-     [275,52,10],[205,62,14],[245,122,10],[130,90,15],[170,155,11]].forEach(function(f){
-      doc.circle(f[0],f[1],f[2],"F");
-    });
-    [[110,42,15,6],[155,172,17,7],[252,32,12,5],[205,92,11,5],[272,152,14,6],[125,125,10,4]].forEach(function(l){
-      doc.ellipse(l[0],l[1],l[2],l[3],"F");
-    });
-    doc.setGState(doc.GState({opacity:1}));
-
     /* DOUBLE BORDURE DOREE */
     doc.setDrawColor(180,145,60); doc.setLineWidth(3); doc.rect(6,6,W-12,H-12);
     doc.setDrawColor(210,180,100); doc.setLineWidth(0.7); doc.rect(11,11,W-22,H-22);
@@ -5574,6 +5561,10 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     }
 
     /* Separateur vertical blanc */
+    var _gf=doc.GState({opacity:0.07});doc.setGState(_gf);doc.setFillColor(CR,CG,CB);
+    [[200,22,15],[252,78,12],[272,152,10],[182,168,13],[232,128,9],[273,42,11],[177,68,10],[242,102,8],[162,138,12],[197,42,10]].forEach(function(f){doc.circle(f[0],f[1],f[2],"F");});
+    [[212,48,14,5],[182,118,12,5],[258,33,10,4],[232,172,13,5],[272,98,10,4]].forEach(function(l){doc.ellipse(l[0],l[1],l[2],l[3],"F");});
+    doc.setGState(doc.GState({opacity:1}));
     doc.setDrawColor(255,255,255); doc.setLineWidth(1);
     doc.line(LW+6,12,LW+6,H-12);
 
@@ -5604,7 +5595,7 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     var subY=36;
     doc.text(subLines,XR+RW/2,subY,{align:"center"});
     /* Trait APRES le sous-titre, avec marge calculee */
-    var traitY=subY+(subLines.length*6)+5;
+    var traitY=subY+(subLines.length*7.5)+6;
     doc.setDrawColor(CR,CG,CB); doc.setLineWidth(1.5);
     doc.line(XR,traitY,XR+RW,traitY);
     doc.setLineWidth(0.3);
@@ -5619,13 +5610,13 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     Y+=11;
 
     /* NOM */
-    doc.setFont("helvetica","bold"); doc.setFontSize(22); doc.setTextColor(CR,CG,CB);
+    doc.setFont("helvetica","bold"); doc.setFontSize(26); doc.setTextColor(CR,CG,CB);
     var nmL=doc.splitTextToSize(nm.toUpperCase(),RW-4);
     doc.text(nmL.slice(0,2),XR+RW/2,Y,{align:"center"});
-    Y+=nmL.length>1?14:10;
+    Y+=nmL.length>1?18:13;
 
     /* "a complete..." */
-    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(80,80,80);
+    doc.setFont("helvetica","normal"); doc.setFontSize(13); doc.setTextColor(80,80,80);
     doc.text("a compl\u00e9t\u00e9 avec succ\u00e8s l'\u00e9valuation :",XR+RW/2,Y,{align:"center"});
     Y+=9;
 
@@ -5633,15 +5624,15 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(40,40,40);
     var qL=doc.splitTextToSize(q.title||"",RW-4);
     doc.text(qL.slice(0,2),XR+RW/2,Y,{align:"center"});
-    Y+=qL.length>1?14:9;
+    Y+=qL.length>1?17:12;
 
     /* Badge score : seulement le % */
     Y+=4;
     var sc=pct>=75?[34,139,70]:pct>=50?[200,140,0]:[200,50,50];
     doc.setFillColor(sc[0],sc[1],sc[2]);
-    doc.roundedRect(XR+RW/2-26,Y-6,52,14,5,5,"F");
-    doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.setTextColor(255,255,255);
-    doc.text(pct+"%",XR+RW/2,Y+4,{align:"center"});
+    doc.roundedRect(XR+RW/2-60,Y-8,120,18,5,5,"F");
+    doc.setFont("helvetica","bold"); doc.setFontSize(14); doc.setTextColor(255,255,255);
+    doc.text(pct+"% — "+mention,XR+RW/2,Y+5,{align:"center",maxWidth:116});
     Y+=16;
 
     /* Date */
