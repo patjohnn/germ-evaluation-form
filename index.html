@@ -5538,18 +5538,19 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     doc.rect(6,6,LW,H-12,"F");
 
 
-    /* Feuilles decoratives gauche */
-    doc.setGState(doc.GState({opacity:0.18}));doc.setFillColor(255,255,255);
+    /* Feuilles zone gauche blanc pur sur fond colore */
+    doc.setFillColor(255,255,255);
     doc.ellipse(6+LW*0.25,H*0.44,9,15,"F");
     doc.ellipse(6+LW*0.72,H*0.62,7,11,"F");
     doc.ellipse(6+LW*0.48,H*0.79,11,17,"F");
     doc.ellipse(6+LW*0.3,H*0.26,8,13,"F");
-    doc.setGState(doc.GState({opacity:1}));
+    doc.ellipse(6+LW*0.8,H*0.35,6,10,"F");
+    doc.ellipse(6+LW*0.15,H*0.68,7,12,"F");
 
     /* LOGO */
     var LOGO_X=11, LOGO_Y=13, LOGO_W=LW-10, LOGO_H=56;
     if(q.logo_url){
-      try{ doc.addImage(q.logo_url,"PNG",LOGO_X,LOGO_Y,LOGO_W,LOGO_H,"logo","NONE"); }
+      try{ doc.addImage(q.logo_url,"",LOGO_X,LOGO_Y,LOGO_W,LOGO_H,"","NONE"); }
       catch(e){
         doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(255,255,255);
         doc.text("GERM SARL",6+LW/2,40,{align:"center",maxWidth:LW-8});
@@ -5562,10 +5563,9 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     }
 
     /* Separateur vertical blanc */
-    var _gf=doc.GState({opacity:0.15});doc.setGState(_gf);doc.setFillColor(34,139,34);
+    doc.setFillColor(200,230,200);
     [[200,22,15],[252,78,12],[272,152,10],[182,168,13],[232,128,9],[273,42,11],[177,68,10],[242,102,8],[162,138,12],[197,42,10]].forEach(function(f){doc.circle(f[0],f[1],f[2],"F");});
     [[212,48,14,5],[182,118,12,5],[258,33,10,4],[232,172,13,5],[272,98,10,4]].forEach(function(l){doc.ellipse(l[0],l[1],l[2],l[3],"F");});
-    doc.setGState(doc.GState({opacity:1}));
     doc.setDrawColor(255,255,255); doc.setLineWidth(1);
     doc.line(LW+6,12,LW+6,H-12);
 
