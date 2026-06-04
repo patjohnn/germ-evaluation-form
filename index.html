@@ -572,8 +572,8 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
 <div id="login-screen" style="display:none">
   <div class="login-card">
     <div class="login-logo">
-      <div class="login-icon">E</div>
-      <div><div style="font-size:18px;font-weight:700">GERM SARL</div><div style="font-size:12px;color:var(--text3)">Plateforme d'évaluation</div></div>
+      <div class="login-icon" style="font-size:11px;width:40px;border-radius:8px">GS</div>
+      <div><div style="font-size:14px;font-weight:700;line-height:1.25">GERM_SARL EVALUATIONS</div><div style="font-size:12px;color:var(--text3)">Plateforme d'évaluation</div></div>
     </div>
     <div class="fgroup"><label class="flabel">Email</label><input type="email" id="login-email" placeholder="admin@exemple.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="fgroup"><label class="flabel">Mot de passe</label><input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
@@ -3663,7 +3663,7 @@ function generatePDF(q, members, answers, sigData, scoreInfo, comments, manualSc
     for(let p=1;p<=npages;p++){
       doc.setPage(p);
       sf('normal',7,[160,160,160]);
-      doc.text('EvalPro — '+q.title,ML,290);
+      doc.text('GERM SARL — '+q.title,ML,290);
       doc.text('Page '+p+' / '+npages,W-MR,290,{align:'right'});
       doc.setDrawColor(200,200,200); doc.setLineWidth(0.2);
       doc.line(ML,287,W-MR,287);
@@ -5502,7 +5502,7 @@ async function notifyAdminNewResponse(qTitle, respondentName, respondentEmail, s
       // Fallback : utiliser le même template que reset
       emailjs.send(_gjsService,_gjsTemplate,{
         to_email:adminEmail,
-        to_name:'Administrateur EvalPro',
+        to_name:'Admin GERM SARL',
         reset_link:'',
         app_name:'GERM_SARL EVALUATIONS',
         expires_in:'',
@@ -5525,46 +5525,164 @@ function initOfflineMode(){const upd=()=>{const off=!navigator.onLine;const b=do
 
 function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
   try{
-    const{jsPDF}=window.jspdf;if(!jsPDF)return null;
-    const doc=new jsPDF({orientation:"l",unit:"mm",format:"a4"});
-    const W=297,H=210;
-    doc.setFillColor(255,255,255);doc.rect(0,0,W,H,"F");
-    doc.setDrawColor(180,145,60);doc.setLineWidth(2.5);doc.rect(8,8,W-16,H-16);
-    doc.setDrawColor(210,180,100);doc.setLineWidth(0.7);doc.rect(13,13,W-26,H-26);
-    const hex=q.color||"#6c63ff";
-    const rgb=hex.match(/\w\w/g)?.map(x=>parseInt(x,16))||[108,99,255];
-    doc.setFillColor(rgb[0],rgb[1],rgb[2]);doc.rect(8,8,W-16,30,"F");
-    doc.setFont("helvetica","bold");doc.setFontSize(15);doc.setTextColor(255,255,255);
-    doc.text((certTitle||"Certificat de Reussite").toUpperCase(),W/2,27,{align:"center",maxWidth:W-60});
-    if(q.logo_url){try{doc.addImage(q.logo_url,"PNG",16,11,22,22);}catch(e){}}
-    doc.setFontSize(8);doc.setFont("helvetica","normal");doc.text("GERM SARL",W-18,18,{align:"right"});
-    doc.setFontSize(10);doc.setTextColor(130,130,130);doc.text("Decerne a",W/2,52,{align:"center"});
-    doc.setDrawColor(rgb[0],rgb[1],rgb[2]);doc.setLineWidth(0.6);doc.line(W/2-35,55,W/2+35,55);
-    doc.setFontSize(26);doc.setFont("helvetica","bold");doc.setTextColor(25,25,25);
-    const nmLines=doc.splitTextToSize(nm,W-60);doc.text(nmLines.slice(0,2),W/2,70,{align:"center"});
-    doc.setFontSize(11);doc.setFont("helvetica","normal");doc.setTextColor(90,90,90);
-    doc.text("pour avoir complete avec succes l'evaluation :",W/2,83,{align:"center",maxWidth:W-60});
-    doc.setFontSize(13);doc.setFont("helvetica","bold");doc.setTextColor(rgb[0],rgb[1],rgb[2]);
-    const qLines=doc.splitTextToSize(q.title||"",W-70);doc.text(qLines.slice(0,2),W/2,94,{align:"center"});
-    const sc=pct>=75?[34,170,90]:pct>=50?[210,150,10]:[200,60,60];
-    doc.setFillColor(sc[0],sc[1],sc[2]);doc.roundedRect(W/2-50,112,100,20,5,5,"F");
-    doc.setFont("helvetica","bold");doc.setFontSize(13);doc.setTextColor(255,255,255);
-    doc.text(pct+"% - "+mention,W/2,125,{align:"center"});
-    if(earned!=null){doc.setFontSize(9);doc.setTextColor(110,110,110);doc.setFont("helvetica","normal");doc.text("Score : "+earned+" pts",W/2,138,{align:"center"});}
-    doc.setDrawColor(210,210,210);doc.setLineWidth(0.4);doc.line(40,H-36,W-40,H-36);
-    doc.setFontSize(9);doc.setFont("helvetica","normal");doc.setTextColor(110,110,110);
-    const ds=new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"});
-    doc.text("Delivre le : "+ds,W/2,H-25,{align:"center"});
-    doc.setDrawColor(rgb[0],rgb[1],rgb[2]);doc.setLineWidth(0.6);doc.ellipse(54,H-20,16,9,"S");
-    doc.setFontSize(7);doc.setTextColor(rgb[0],rgb[1],rgb[2]);doc.setFont("helvetica","bold");
-    doc.text("VALIDE",54,H-20,{align:"center"});
+    var jsPDFLib=window.jspdf;
+    if(!jsPDFLib||!jsPDFLib.jsPDF)return null;
+    var doc=new jsPDFLib.jsPDF({orientation:"l",unit:"mm",format:"a4"});
+    var W=297,H=210;
+
+    // Fond blanc
+    doc.setFillColor(255,255,255);
+    doc.rect(0,0,W,H,"F");
+
+    // Couleur principale
+    var hex=q.color||"#2d6a4f";
+    var m=hex.match(/\w\w/g)||["2d","6a","4f"];
+    var R=parseInt(m[0],16),G=parseInt(m[1],16),B=parseInt(m[2],16);
+
+    // Double bordure colorée
+    doc.setDrawColor(R,G,B);
+    doc.setLineWidth(4);
+    doc.rect(5,5,W-10,H-10);
+    doc.setLineWidth(0.8);
+    doc.rect(9,9,W-18,H-18);
+
+    // ── Zone gauche colorée ──
+    var LW=82;
+    doc.setFillColor(R,G,B);
+    doc.rect(5,5,LW,H-10,"F");
+
+    // Logo dans zone gauche
+    if(q.logo_url){
+      try{
+        doc.addImage(q.logo_url,"PNG",10,15,LW-10,38);
+      }catch(e){
+        doc.setFont("helvetica","bold");doc.setFontSize(15);
+        doc.setTextColor(255,255,255);
+        doc.text("GERM SARL",5+LW/2,45,{align:"center",maxWidth:LW-8});
+      }
+    } else {
+      doc.setFont("helvetica","bold");doc.setFontSize(14);
+      doc.setTextColor(255,255,255);
+      doc.text("GERM SARL",5+LW/2,45,{align:"center",maxWidth:LW-8});
+      doc.setFontSize(9);doc.setFont("helvetica","normal");
+      doc.text("EVALUATIONS",5+LW/2,54,{align:"center"});
+    }
+
+    // Cercle cachet bas gauche
+    doc.setDrawColor(255,255,255);doc.setLineWidth(1);
+    doc.circle(5+LW/2,H-32,14);
+    doc.setFont("helvetica","bold");doc.setFontSize(8);
+    doc.setTextColor(255,255,255);
+    doc.text(pct>= 75?"RECU":"INCOMPLET",5+LW/2,H-35,{align:"center"});
+    doc.text(pct+"%",5+LW/2,H-29,{align:"center"});
+
+    // Texte certif gauche bas
+    doc.setFont("helvetica","normal");doc.setFontSize(7);
+    doc.setTextColor(255,255,255);
+    doc.text("CERTIFICAT DE COMPETENCE",5+LW/2,H-14,{align:"center",maxWidth:LW-6});
+
+    // ── Zone droite ──
+    var XR=LW+18;
+    var RW=W-XR-12;
+
+    // CERTIFICAT en grand
+    doc.setFont("helvetica","bold");doc.setFontSize(36);
+    doc.setTextColor(R,G,B);
+    doc.text("CERTIFICAT",XR+RW/2,30,{align:"center"});
+
+    // "DE COMPÉTENCE" ou titre
+    doc.setFont("helvetica","normal");doc.setFontSize(16);
+    doc.setTextColor(60,60,60);
+    var sub=(certTitle||"de Competence").toUpperCase();
+    doc.text(sub,XR+RW/2,41,{align:"center",maxWidth:RW});
+
+    // Séparateur
+    doc.setDrawColor(R,G,B);doc.setLineWidth(1.5);
+    doc.line(XR,46,XR+RW,46);
+    doc.setLineWidth(0.3);
+    doc.line(XR,48,XR+RW,48);
+
+    // Certifions que
+    doc.setFont("helvetica","italic");doc.setFontSize(10);
+    doc.setTextColor(100,100,100);
+    doc.text("Nous certifions que",XR+RW/2,59,{align:"center"});
+
+    // NOM grand et coloré
+    doc.setFont("helvetica","bold");doc.setFontSize(22);
+    doc.setTextColor(R,G,B);
+    var nmLines=doc.splitTextToSize(nm.toUpperCase(),RW-4);
+    doc.text(nmLines.slice(0,2),XR+RW/2,71,{align:"center"});
+
+    // "a complété avec succès"
+    doc.setFont("helvetica","normal");doc.setFontSize(10);
+    doc.setTextColor(80,80,80);
+    doc.text("a complete avec succes l'evaluation :",XR+RW/2,83,{align:"center"});
+
+    // Titre questionnaire
+    doc.setFont("helvetica","bold");doc.setFontSize(11);
+    doc.setTextColor(40,40,40);
+    var qLines=doc.splitTextToSize(q.title||"",RW-6);
+    doc.text(qLines.slice(0,2),XR+RW/2,92,{align:"center"});
+
+    // Badge score
+    var sc=pct>=75?[34,139,70]:pct>=50?[200,140,0]:[200,50,50];
+    doc.setFillColor(sc[0],sc[1],sc[2]);
+    doc.roundedRect(XR+RW/2-50,99,100,13,3,3,"F");
+    doc.setFont("helvetica","bold");doc.setFontSize(9);
+    doc.setTextColor(255,255,255);
+    var scoreText="Note : "+pct+"% — "+mention+(earned!=null?" | "+earned+" pts":"");
+    doc.text(scoreText,XR+RW/2,107,{align:"center",maxWidth:96});
+
+    // Date
+    doc.setFont("helvetica","normal");doc.setFontSize(9);
+    doc.setTextColor(80,80,80);
+    var ds=new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"});
+    doc.text("Delivre le : "+ds,XR+RW/2,120,{align:"center"});
+
+    // Ligne séparation
+    doc.setDrawColor(210,210,210);doc.setLineWidth(0.4);
+    doc.line(XR,126,XR+RW,126);
+
+    // Signatures (2 colonnes)
+    var s1=XR+RW*0.27;
+    var s2=XR+RW*0.73;
+
+    // Sig 1
+    doc.setDrawColor(90,90,90);doc.setLineWidth(0.5);
+    doc.line(s1-28,H-24,s1+28,H-24);
+    doc.setFont("helvetica","bold");doc.setFontSize(8);
+    doc.setTextColor(R,G,B);
+    doc.text("GERM SARL",s1,H-18,{align:"center"});
+    doc.setFont("helvetica","normal");doc.setFontSize(7);
+    doc.setTextColor(110,110,110);
+    doc.text("Responsable evaluations",s1,H-13,{align:"center"});
+
+    // Sig 2
+    doc.line(s2-28,H-24,s2+28,H-24);
+    doc.setFont("helvetica","bold");doc.setFontSize(8);
+    doc.setTextColor(R,G,B);
+    doc.text("Direction",s2,H-18,{align:"center"});
+    doc.setFont("helvetica","normal");doc.setFontSize(7);
+    doc.setTextColor(110,110,110);
+    doc.text("Directeur General",s2,H-13,{align:"center"});
+
+    // Pied de page
+    doc.setDrawColor(R,G,B);doc.setLineWidth(0.4);
+    doc.line(XR,H-9,XR+RW,H-9);
+    doc.setFontSize(7);doc.setTextColor(140,140,140);
+    var certNum="CERT-"+new Date().getFullYear()+"-"+Math.random().toString(36).slice(2,8).toUpperCase();
+    doc.text("N° : "+certNum,XR+4,H-5);
+    doc.text("DATE : "+new Date().toLocaleDateString("fr-FR"),XR+RW-4,H-5,{align:"right"});
+
     return doc.output("datauristring").split(",")[1];
-  }catch(e){console.warn("Cert:",e);return null;}
+  }catch(e){console.warn("Cert error:",e);return null;}
 }
+
+
 function toggleSidebar(){const sb=document.getElementById("sidebar");const ov=document.getElementById("mobile-overlay");const hb=document.getElementById("hamburger");const o=sb.classList.contains("mobile-open");sb.classList.toggle("mobile-open",!o);ov.classList.toggle("visible",!o);hb.classList.toggle("open",!o);document.body.style.overflow=o?"":"hidden";}
 function closeSidebar(){document.getElementById("sidebar")?.classList.remove("mobile-open");document.getElementById("mobile-overlay")?.classList.remove("visible");document.getElementById("hamburger")?.classList.remove("open");document.body.style.overflow="";}
 function setBottomNav(v){document.querySelectorAll(".bnav-btn").forEach(b=>b.classList.toggle("active",b.id==="bnav-"+v));}
-function updateMobileTitle(t){const el=document.getElementById("mobile-page-title");if(el)el.textContent=t||"EvalPro";}
+function updateMobileTitle(t){const el=document.getElementById("mobile-page-title");if(el)el.textContent=t||"GERM SARL";}
 function isMobile(){return window.innerWidth<=768;}
 
 function initDarkMode(){
