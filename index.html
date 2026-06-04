@@ -2,7 +2,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EvalPro — Plateforme d'évaluation</title>
+<title>GERM_SARL EVALUATIONS — Plateforme d'évaluation</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3/dist/email.min.js"></script>
@@ -485,7 +485,7 @@ body[data-role="viewer"] .btn-success{display:none!important;}
   <div class="setup-wrap">
     <div style="text-align:center;margin-bottom:2.5rem">
       <div style="font-size:32px;margin-bottom:.5rem">⚙️</div>
-      <div style="font-size:22px;font-weight:700;margin-bottom:.5rem">Configuration EvalPro</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:.5rem">Configuration GERM_SARL EVALUATIONS</div>
       <div style="font-size:14px;color:var(--text2)">Connectez votre base de données Supabase en 3 étapes simples</div>
     </div>
     <div class="card">
@@ -573,7 +573,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
   <div class="login-card">
     <div class="login-logo">
       <div class="login-icon">E</div>
-      <div><div style="font-size:18px;font-weight:700">EvalPro</div><div style="font-size:12px;color:var(--text3)">Plateforme d'évaluation</div></div>
+      <div><div style="font-size:18px;font-weight:700">GERM SARL</div><div style="font-size:12px;color:var(--text3)">Plateforme d'évaluation</div></div>
     </div>
     <div class="fgroup"><label class="flabel">Email</label><input type="email" id="login-email" placeholder="admin@exemple.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div class="fgroup"><label class="flabel">Mot de passe</label><input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
@@ -632,7 +632,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
     <div id="sidebar">
       <div class="sb-logo">
         <div class="sb-icon">E</div>
-        <div><div class="sb-text">EvalPro</div><div class="sb-sub">Administration</div></div>
+        <div><div class="sb-text">GERM SARL</div><div class="sb-sub">Administration</div></div>
       </div>
       <nav class="sb-nav">
         <div class="sb-sec">Principal</div>
@@ -646,7 +646,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       <div class="sb-footer">
         <div class="sb-uname" id="sb-uname">Administrateur</div>
         <div id="sb-role-badge"></div>
-        <div class="sb-uinfo">EvalPro · Supabase ☁️</div>
+        <div class="sb-uinfo">GERM SARL · Supabase ☁️</div>
         <button class="dark-toggle" onclick="toggleDark()" id="dark-btn" style="margin-top:.75rem;width:100%;justify-content:center">
           <span id="dark-icon">🌙</span> <span id="dark-label">Mode sombre</span>
         </button>
@@ -1086,7 +1086,7 @@ async function renderDashboard(){
   updateBadges();
   const todayRs=(rs||[]).filter(r=>new Date(r.created_at).toDateString()===new Date().toDateString()).length;
   document.getElementById('content').innerHTML=`
-    <div class="pg-title">Bonjour 👋</div><div class="pg-sub">Aperçu en temps réel de votre activité EvalPro.</div>
+    <div class="pg-title">Bonjour 👋</div><div class="pg-sub">Aperçu en temps réel de votre activité GERM SARL.</div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-lbl">Questionnaires</div><div class="stat-val">${(qs||[]).length}</div><div class="stat-sub">créés au total</div></div>
       <div class="stat-card"><div class="stat-lbl">Réponses totales</div><div class="stat-val">${(rs||[]).length}</div><div class="stat-sub">soumissions reçues</div></div>
@@ -2184,7 +2184,8 @@ function buildRespDetailHtml(q,r){
   html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
   if(canCorrect())html+='<button class="btn btn-sm btn-success" data-rid="'+r.id+'" data-qid="'+q.id+'" onclick="saveGrade(this.dataset.rid,this.dataset.qid)">&#128190; Enregistrer</button>';
   html+='<button class="btn btn-sm" onclick="adminDownloadPDF(this.dataset.rid)" data-rid="'+r.id+'">&#128196; PDF</button>';
-  if(q.cert_threshold&&pct>=+q.cert_threshold)html+='<button class="btn btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none" data-rid="'+r.id+'" data-qid="'+q.id+'" onclick="adminGenerateCert(this.dataset.rid,this.dataset.qid)">&#127881; Certificat</button>';
+  const _cs=q.cert_threshold&&pct>=+q.cert_threshold?'background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none':'background:var(--bg2);color:var(--text);border:.5px solid var(--border2)';
+  html+='<button class="btn btn-sm" style="'+_cs+'" data-rid="'+r.id+'" data-qid="'+q.id+'" onclick="adminGenerateCert(this.dataset.rid,this.dataset.qid)">&#127881; Certificat</button>';
   html+='</div></div>';
   (q.questions||[]).forEach((qq,qi)=>{
     const ans=(r.answers||{})[qq.id];
@@ -2679,7 +2680,7 @@ async function exportAllXLSX(){
     XLSX.utils.book_append_sheet(wb,wsRecap,'Résumé global');
 
     // ── Téléchargement ──
-    const fname='EvalPro_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    const fname='GERM_SARL_'+new Date().toISOString().slice(0,10)+'.xlsx';
     XLSX.writeFile(wb,fname);
     toast('Export XLSX téléchargé !');
   }catch(e){
@@ -2703,7 +2704,7 @@ function renderSettings(){
   document.getElementById('tb-title').textContent='Paramètres';
   document.getElementById('tb-actions').innerHTML='';
   document.getElementById('content').innerHTML=`
-    <div class="pg-title">Paramètres</div><div class="pg-sub">Configuration de EvalPro.</div>
+    <div class="pg-title">Paramètres</div><div class="pg-sub">Configuration de GERM_SARL EVALUATIONS.</div>
     <div class="card"><div class="sec-title">Connexion Supabase</div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
         <div><div style="font-size:14px;font-weight:500">Base de données</div><div style="font-size:12px;color:var(--text3);font-family:monospace;margin-top:2px">${gc(K_URL)}</div></div>
@@ -4167,6 +4168,12 @@ function toggleNotifPanel() {
   panel.classList.toggle('open');
   if (panel.classList.contains('open')) {
     renderNotifList();
+    // Marquer toutes comme lues après 1s (temps de les voir)
+    setTimeout(() => {
+      if (panel.classList.contains('open')) {
+        markAllRead();
+      }
+    }, 1200);
   }
 }
 
@@ -4609,7 +4616,7 @@ function showAdminApp(){
   const roleEl=document.querySelector('.sb-uinfo');
   if(roleEl&&currentUser){
     const roleLabels={admin:'Administrateur',corrector:'Correcteur',viewer:'Lecteur'};
-    roleEl.textContent=(roleLabels[currentUser.role]||currentUser.role)+' · EvalPro';
+    roleEl.textContent=(roleLabels[currentUser.role]||currentUser.role)+' · GERM SARL';
   }
 }
 
@@ -5191,7 +5198,7 @@ async function requestPasswordReset(){
       to_email:email,
       to_name:user.name||email,
       reset_link:resetLink,
-      app_name:'EvalPro',
+      app_name:'GERM_SARL EVALUATIONS',
       expires_in:'1 heure'
     });
 
@@ -5395,7 +5402,7 @@ function sendReminderEmail(email,name,qid){
   if(!_gjsService||!_gjsTemplate||!_gjsKey){toast('EmailJS non configure.','error');return;}
   const link=window.location.origin+window.location.pathname+'?q='+qid;
   emailjs.init(_gjsKey);
-  emailjs.send(_gjsService,_gjsTemplate,{to_email:email,to_name:name||email,subject:'Rappel evaluation en attente',message:'Vous avez commence une evaluation. Cliquez le lien pour reprendre.',reset_link:link,app_name:'EvalPro',expires_in:'—'}).then(()=>toast('Rappel envoye.')).catch(e=>toast('Erreur: '+(e.text||e.message),'error'));
+  emailjs.send(_gjsService,_gjsTemplate,{to_email:email,to_name:name||email,subject:'Rappel evaluation en attente',message:'Vous avez commence une evaluation. Cliquez le lien pour reprendre.',reset_link:link,app_name:'GERM_SARL EVALUATIONS',expires_in:'—'}).then(()=>toast('Rappel envoye.')).catch(e=>toast('Erreur: '+(e.text||e.message),'error'));
 }
 function sendAllReminders(){document.querySelectorAll('#abandon-list .btn-primary').forEach(b=>b.click());}
 function clearAbandon(key){if(!confirm('Supprimer ?'))return;localStorage.removeItem(key);showAbandonedProgress();}
@@ -5490,16 +5497,16 @@ async function notifyAdminNewResponse(qTitle, respondentName, respondentEmail, s
       respondent_name:respondentName||'',
       respondent_email:respondentEmail||'',
       score,
-      app_name:'EvalPro'
+      app_name:'GERM_SARL EVALUATIONS'
     }).catch(()=>{
       // Fallback : utiliser le même template que reset
       emailjs.send(_gjsService,_gjsTemplate,{
         to_email:adminEmail,
         to_name:'Administrateur EvalPro',
         reset_link:'',
-        app_name:'EvalPro',
+        app_name:'GERM_SARL EVALUATIONS',
         expires_in:'',
-        subject:'Nouvelle réponse EvalPro',
+        subject:'Nouvelle réponse GERM SARL',
         message:'Nouvelle réponse de '+respondentName+' ('+respondentEmail+') pour "'+qTitle+'". Score: '+score
       });
     });
@@ -5530,7 +5537,7 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     doc.setFont("helvetica","bold");doc.setFontSize(15);doc.setTextColor(255,255,255);
     doc.text((certTitle||"Certificat de Reussite").toUpperCase(),W/2,27,{align:"center",maxWidth:W-60});
     if(q.logo_url){try{doc.addImage(q.logo_url,"PNG",16,11,22,22);}catch(e){}}
-    doc.setFontSize(8);doc.setFont("helvetica","normal");doc.text("EvalPro",W-18,18,{align:"right"});
+    doc.setFontSize(8);doc.setFont("helvetica","normal");doc.text("GERM SARL",W-18,18,{align:"right"});
     doc.setFontSize(10);doc.setTextColor(130,130,130);doc.text("Decerne a",W/2,52,{align:"center"});
     doc.setDrawColor(rgb[0],rgb[1],rgb[2]);doc.setLineWidth(0.6);doc.line(W/2-35,55,W/2+35,55);
     doc.setFontSize(26);doc.setFont("helvetica","bold");doc.setTextColor(25,25,25);
