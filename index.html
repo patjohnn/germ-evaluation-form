@@ -647,7 +647,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
         <button class="nav-item" id="nav-questionnaires" onclick="navigate('questionnaires')"><span class="nav-icon">📋</span> Questionnaires<span class="nav-badge" id="nb-q">0</span></button>
         <button class="nav-item" id="nav-responses" onclick="navigate('responses')"><span class="nav-icon">📥</span> Réponses<span class="nav-badge" id="nb-r">0</span></button>
         <div class="sb-sec" style="margin-top:.5rem">Paramètres</div>
-        <button class="nav-item canEdit" id="nav-respondents" onclick="renderRespondentsPage()" style="display:none"><span class="nav-icon">&#128100;</span> Répondants</button>
+        <button class="nav-item" id="nav-respondents" onclick="renderRespondentsPage()" data-role-show="admin,corrector"><span class="nav-icon">&#128100;</span> Répondants</button>
         <button class="nav-item" id="nav-settings" data-role-hide="admin" onclick="navigate('settings')"><span class="nav-icon">⚙️</span> Paramètres</button>
         <button class="nav-item" onclick="doLogout()"><span class="nav-icon">🚪</span> Déconnexion</button>
       </nav>
@@ -4934,6 +4934,11 @@ function applyRoleRestrictions(){
     const allowed=(el.dataset.roleHide||'').split(',').map(r=>r.trim());
     el.classList.toggle('role-hidden',!allowed.includes(role));
   });
+  // data-role-show : visible SEULEMENT pour les roles listés
+  document.querySelectorAll('[data-role-show]').forEach(el=>{
+    const allowed=(el.dataset.roleShow||'').split(',').map(r=>r.trim());
+    el.style.display=allowed.includes(role)?'flex':'none';
+  });
 }
 
 // ─── GESTION UTILISATEURS ────────────────────────────
@@ -5991,7 +5996,15 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle,verifyUrl,qrDa
     doc.setTextColor(110,110,110);
     doc.text("Directeur General",s2,sY+10,{align:"center",maxWidth:60});
 
-    if(qrDataUrl){try{doc.addImage(qrDataUrl,"PNG",XR,H-33,22,22);}catch(_qe){}}
+    /* QR Code anti-falsification - bas gauche zone droite */
+    if(qrDataUrl){
+      try{
+        var _qrBase=qrDataUrl.indexOf(",")>-1?qrDataUrl.split(",")[1]:qrDataUrl;
+        doc.addImage("data:image/png;base64,"+_qrBase,"PNG",XR,H-30,20,20);
+        doc.setFont("helvetica","normal");doc.setFontSize(5.5);doc.setTextColor(130,130,130);
+        doc.text("Scanner pour verifier",XR+10,H-7,{align:"center",maxWidth:24});
+      }catch(_qe){console.warn("QR PDF:",_qe);}
+    }
     /* Pied de page */
     doc.setDrawColor(CR,CG,CB);doc.setLineWidth(0.4);
     doc.line(XR,H-9,XR+RW,H-9);
