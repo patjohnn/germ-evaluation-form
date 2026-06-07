@@ -1130,9 +1130,52 @@ async function renderRespondentLoginForm(code,qtitle){
     +'<button class="btn btn-primary" style="width:100%;margin-top:.75rem;justify-content:center" '
     +'onclick="doRespondentLogin(\''+code+'\')" id="resp-login-btn">Se connecter</button>'
     +'<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:.75rem">'
-    +'Contactez votre administrateur si vous n\'avez pas de compte.</div>'
+    +'Pas encore de compte ? <a href="#" style="font-size:11px" onclick="event.preventDefault();showRegisterForm(\''+code+'\')">Créer un compte</a></div>'
     +'</div>';
   setTimeout(()=>{const e=document.getElementById('resp-email');if(e)e.focus();},100);
+}
+
+
+async function showRegisterForm(code){
+  const wrap=document.getElementById('quiz-container');if(!wrap)return;
+  const{data:q}=await SB.from('questionnaires').select('title').eq('code',code).single();
+  wrap.innerHTML='<div class="resp-login-wrap">'
+    +'<div style="text-align:center;margin-bottom:1.5rem">'
+    +'<div style="font-size:32px;margin-bottom:.5rem">&#128221;</div>'
+    +'<div style="font-size:17px;font-weight:700">Cr\u00e9er un compte</div>'
+    +'<div style="font-size:13px;color:var(--text2);margin-top:.25rem">'+(q?esc(q.title):'')+'</div>'
+    +'<div style="font-size:12px;color:var(--text3);margin-top:.25rem">Votre compte sera valid\u00e9 par un administrateur avant acc\u00e8s.</div>'
+    +'</div>'
+    +'<div class="fgroup"><label class="flabel">Nom complet *</label><input id="reg-name" class="finput" placeholder="Pr\u00e9nom Nom"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Email *</label><input id="reg-email" class="finput" type="email" placeholder="votre@email.com"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Mot de passe * (min. 6 car.)</label><input id="reg-pwd" class="finput" type="password"></div>'
+    +'<div id="reg-err" style="font-size:12px;color:#dc2626;margin-top:.5rem;min-height:1rem"></div>'
+    +'<button class="btn btn-primary" style="width:100%;margin-top:.75rem;justify-content:center" onclick="doRegisterRespondent(\''+code+'\')" id="reg-btn">S\'inscrire</button>'
+    +'<div style="text-align:center;margin-top:.75rem"><button class="btn btn-sm" onclick="renderRespondentLoginForm(\''+code+'\',\'\')">&#8592; Retour connexion</button></div>'
+    +'</div>';
+}
+
+async function doRegisterRespondent(code){
+  const name=(document.getElementById('reg-name')?.value||'').trim();
+  const email=(document.getElementById('reg-email')?.value||'').trim().toLowerCase();
+  const pwd=document.getElementById('reg-pwd')?.value||'';
+  const errEl=document.getElementById('reg-err');
+  const btn=document.getElementById('reg-btn');
+  if(!name||!email||!pwd){if(errEl)errEl.textContent='Tous les champs requis.';return;}
+  if(pwd.length<6){if(errEl)errEl.textContent='Mot de passe : 6 caract\u00e8res minimum.';return;}
+  if(btn){btn.textContent='Inscription...';btn.disabled=true;}
+  const hash=await sha256(pwd);
+  const{error}=await SB.from('respondents').insert({name,email,password_hash:hash,active:false});
+  if(error){
+    if(errEl)errEl.textContent=error.code==='23505'?'Cet email est d\u00e9j\u00e0 utilis\u00e9.':'Erreur : '+error.message;
+    if(btn){btn.textContent='S\'inscrire';btn.disabled=false;}return;
+  }
+  const wrap=document.getElementById('quiz-container');
+  if(wrap)wrap.innerHTML='<div class="resp-login-wrap" style="text-align:center">'
+    +'<div style="font-size:40px;margin-bottom:1rem">&#9989;</div>'
+    +'<div style="font-size:17px;font-weight:700;margin-bottom:.5rem">Inscription envoy\u00e9e !</div>'
+    +'<div style="font-size:13px;color:var(--text2)">Votre compte est en attente de validation.<br>Un administrateur va activer votre acc\u00e8s.</div>'
+    +'<button class="btn btn-sm" style="margin-top:1rem" onclick="renderRespondentLoginForm(\''+code+'\',\'\')">&#8592; Retour connexion</button></div>';
 }
 
 async function doRespondentLogin(code){
@@ -1191,7 +1234,15 @@ async function renderRespondentsPage(){
 }
 
 function openAddRespondentModal(){
-  const m=document.getElementById('modal-gen');if(!m)return;
+  let m=document.getElementById('modal-gen');
+  if(!m){
+    m=document.createElement('div');m.id='modal-gen';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem';
+    const mi=document.createElement('div');mi.className='modal-inner';
+    mi.style.cssText='width:100%;max-width:460px;max-height:90vh;overflow-y:auto;background:var(--bg);border-radius:var(--rxl);box-shadow:0 20px 60px rgba(0,0,0,.3)';
+    m.appendChild(mi);document.body.appendChild(m);
+    m.addEventListener('click',function(e){if(e.target===m)closeModal('modal-gen');});
+  }
   m.querySelector('.modal-inner').innerHTML=
     '<div class="mhdr"><div class="mhdr-title">Nouveau compte repondant</div>'
     +'<button class="mclose" onclick="closeModal(\'modal-gen\')">&#10005;</button></div>'
@@ -1218,7 +1269,15 @@ async function createRespondent(){
 }
 
 async function editRespondent(id,name,email,active){
-  const m=document.getElementById('modal-gen');if(!m)return;
+  let m=document.getElementById('modal-gen');
+  if(!m){
+    m=document.createElement('div');m.id='modal-gen';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem';
+    const mi=document.createElement('div');mi.className='modal-inner';
+    mi.style.cssText='width:100%;max-width:460px;max-height:90vh;overflow-y:auto;background:var(--bg);border-radius:var(--rxl);box-shadow:0 20px 60px rgba(0,0,0,.3)';
+    m.appendChild(mi);document.body.appendChild(m);
+    m.addEventListener('click',function(e){if(e.target===m)closeModal('modal-gen');});
+  }
   m.querySelector('.modal-inner').innerHTML=
     '<div class="mhdr"><div class="mhdr-title">Modifier le compte</div>'
     +'<button class="mclose" onclick="closeModal(\'modal-gen\')">&#10005;</button></div>'
@@ -5996,14 +6055,14 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle,verifyUrl,qrDa
     doc.setTextColor(110,110,110);
     doc.text("Directeur General",s2,sY+10,{align:"center",maxWidth:60});
 
-    /* QR Code anti-falsification - bas gauche zone droite */
+    /* QR Code anti-falsification sous la date */
     if(qrDataUrl){
       try{
-        var _qrBase=qrDataUrl.indexOf(",")>-1?qrDataUrl.split(",")[1]:qrDataUrl;
-        doc.addImage("data:image/png;base64,"+_qrBase,"PNG",XR,H-30,20,20);
-        doc.setFont("helvetica","normal");doc.setFontSize(5.5);doc.setTextColor(130,130,130);
-        doc.text("Scanner pour verifier",XR+10,H-7,{align:"center",maxWidth:24});
-      }catch(_qe){console.warn("QR PDF:",_qe);}
+        var _qrB64=qrDataUrl.split(",").pop();
+        doc.addImage(_qrB64,"PNG",midX-12,Y+5,24,24);
+        doc.setFont("helvetica","normal");doc.setFontSize(6);doc.setTextColor(120,120,120);
+        doc.text("Scanner pour verifier",midX,Y+32,{align:"center",maxWidth:RW});
+      }catch(_qe){console.warn("QR PDF err:",_qe);}
     }
     /* Pied de page */
     doc.setDrawColor(CR,CG,CB);doc.setLineWidth(0.4);
@@ -6236,5 +6295,6 @@ init();
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-gen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"><div class="modal-inner" style="width:100%;max-width:460px;max-height:90vh;overflow-y:auto;background:var(--bg);border-radius:var(--rxl);box-shadow:0 20px 60px rgba(0,0,0,.3)"></div></div>
 </body>
 </html>
