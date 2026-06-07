@@ -195,6 +195,13 @@ input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--te
 .acc-badge{font-size:10px;font-weight:600;background:var(--purple-bg,#ede9fe);color:var(--purple-text,#7c3aed);padding:1px 6px;border-radius:99px}
 .acc-body{padding:1rem;display:none;border-top:.5px solid var(--border);animation:fadeIn .2s ease}
 .acc-header[aria-expanded='true'] + .acc-body{display:block}
+.verify-card{max-width:520px;margin:3rem auto;padding:2.5rem;border-radius:var(--rxl);border:.5px solid var(--border);background:var(--bg);text-align:center}
+.verify-valid{border-color:#22c55e!important;background:linear-gradient(135deg,#f0fdf4,var(--bg))}
+.verify-invalid{border-color:#ef4444!important;background:linear-gradient(135deg,#fef2f2,var(--bg))}
+.verify-icon{font-size:48px;margin-bottom:1rem}
+.verify-name{font-size:22px;font-weight:700;color:var(--text);margin:.5rem 0}
+.verify-detail{font-size:13px;color:var(--text2);line-height:1.8}
+.resp-login-wrap{max-width:380px;margin:2rem auto;padding:2rem;border-radius:var(--rxl);border:.5px solid var(--border);background:var(--bg)}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .copy-link{display:flex;align-items:center;background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--r);padding:8px 12px;font-size:12px;font-family:monospace;color:var(--text2);word-break:break-all;flex:1}
 /* spinner */
@@ -640,6 +647,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
         <button class="nav-item" id="nav-questionnaires" onclick="navigate('questionnaires')"><span class="nav-icon">📋</span> Questionnaires<span class="nav-badge" id="nb-q">0</span></button>
         <button class="nav-item" id="nav-responses" onclick="navigate('responses')"><span class="nav-icon">📥</span> Réponses<span class="nav-badge" id="nb-r">0</span></button>
         <div class="sb-sec" style="margin-top:.5rem">Paramètres</div>
+        <button class="nav-item canEdit" id="nav-respondents" onclick="renderRespondentsPage()" style="display:none"><span class="nav-icon">&#128100;</span> Répondants</button>
         <button class="nav-item" id="nav-settings" data-role-hide="admin" onclick="navigate('settings')"><span class="nav-icon">⚙️</span> Paramètres</button>
         <button class="nav-item" onclick="doLogout()"><span class="nav-icon">🚪</span> Déconnexion</button>
       </nav>
@@ -832,7 +840,10 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       </button>
       <div class="acc-body" style="display:none">
     <div class="frow3" style="margin-bottom:1rem">
-      <div class="fgroup" style="margin-bottom:0"><label class="flabel">Soumissions autorisées</label>
+      <div class="fgroup" style="margin-bottom:0"><label class="flabel">Connexion répondant requise <span style="font-weight:400;color:var(--text3);font-size:11px">(répondants doivent avoir un compte)</span></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="q-require-login" style="width:15px;height:15px"> Connexion obligatoire</label>
+      </div><div class="fgroup">
+        <label class="flabel">Soumissions autorisées</label>
         <select id="q-max-attempts"><option value="1">1 fois</option><option value="2">2 fois</option><option value="0">Illimité</option></select>
       </div>
       <div class="fgroup" style="margin-bottom:0"><label class="flabel">Mode groupe</label>
@@ -966,7 +977,304 @@ const hideLov=()=>document.getElementById('lov').style.display='none';
 const loading=html=>`<div style="text-align:center;padding:3rem"><div class="big-spinner" style="margin:0 auto"></div>${html?`<div style="margin-top:1rem;font-size:13px;color:var(--text3)">${html}</div>`:''}</div>`;
 
 // ─── INIT ─────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// SÉCURITÉ CERTIFICATS — QR Code anti-falsification
+// ═══════════════════════════════════════════════════════════
+
+async function saveCertificate(rid,qid,name,email,pct,pts,mention,certTitle){
+  try{
+    const{data,error}=await SB.from('certificates').insert({
+      response_id:rid,questionnaire_id:qid,
+      respondent_name:name,respondent_email:email,
+      score_pct:pct,score_pts:pts,mention:mention,cert_title:certTitle,
+      issued_by:(currentUser?currentUser.name:'Admin')
+    }).select('id').single();
+    if(error){console.warn('cert save:',error);return null;}
+    return data.id;
+  }catch(e){console.warn('saveCertificate:',e);return null;}
+}
+
+async function adminGenerateCert(rid,qid){
+  const [{data:q},{data:r}]=await Promise.all([
+    SB.from('questionnaires').select('*').eq('id',qid).single(),
+    SB.from('responses').select('*').eq('id',rid).single()
+  ]);
+  if(!q||!r){toast('Introuvable.','error');return;}
+  const autoSc=autoGrade(q,r.answers||{});
+  const manSc=r.manual_scores||{};
+  const totalPts=calcTotalPts(q);
+  let earned=0;
+  (q.questions||[]).forEach(qq=>{
+    const ms=manSc[qq.id],as=autoSc[qq.id];
+    if(ms!==undefined&&ms!==null)earned+=+ms;
+    else if(as!==null&&as!==undefined)earned+=+as;
+  });
+  const pct=totalPts>0?Math.round(earned/totalPts*100):0;
+  if(!q.cert_threshold||pct<+q.cert_threshold){
+    toast('Seuil non atteint : '+pct+'% / '+q.cert_threshold+'% requis.','error');return;
+  }
+  const name=r.group_name||r.respondent_name||'Repondant';
+  const email=r.respondent_email||'';
+  const mn=getMention(pct);
+  const certTitle=q.cert_title||'Certificat de reussite';
+
+  toast('Enregistrement certificat...','info');
+  const certId=await saveCertificate(rid,qid,name,email,pct,earned,mn.txt,certTitle);
+  if(!certId){
+    toast('Erreur sauvegarde. Verifiez que la table certificates existe dans Supabase.','error');
+    return;
+  }
+  const verifyUrl=window.location.origin+window.location.pathname+'?verify='+certId;
+  let qrDataUrl=null;
+  try{
+    if(typeof QRCode!=='undefined'){
+      qrDataUrl=await new Promise((res,rej)=>{
+        QRCode.toDataURL(verifyUrl,{width:120,margin:1,color:{dark:'#1a1a2e',light:'#ffffff'}},
+          (err,url)=>err?rej(err):res(url));
+      });
+    }
+  }catch(e){console.warn('QR:',e);}
+
+  const b64=generateCertificatePDF(q,name,earned,pct,mn.txt,certTitle,verifyUrl,qrDataUrl,certId);
+  if(!b64){toast('Erreur generation PDF.','error');return;}
+  const a=document.createElement('a');
+  a.href='data:application/pdf;base64,'+b64;
+  a.download='Certificat_'+name.replace(/\s+/g,'_').slice(0,25)+'_'+certId.slice(0,8)+'.pdf';
+  a.click();
+  toast('Certificat securise telecharge ! (ID: '+certId.slice(0,8).toUpperCase()+')','success');
+}
+
+async function showVerifyPage(certId){
+  document.body.innerHTML='<div style="min-height:100vh;background:var(--bg);padding:1rem;font-family:inherit">'
+    +'<div style="max-width:520px;margin:2rem auto">'
+    +'<a href="'+window.location.pathname+'" style="color:var(--text3);font-size:13px;text-decoration:none">'
+    +'\u2190 Retour</a>'
+    +'<div id="verify-content" style="margin-top:1rem">'
+    +'<div class="card" style="text-align:center;padding:2rem">'
+    +'<div style="font-size:32px">\u23f3</div>'
+    +'<div style="margin-top:.5rem;color:var(--text3)">Verification en cours...</div>'
+    +'</div></div></div></div>';
+  try{
+    const{data:cert,error}=await SB.from('certificates').select('*').eq('id',certId).single();
+    const el=document.getElementById('verify-content');
+    if(error||!cert){
+      el.innerHTML='<div class="verify-card verify-invalid">'
+        +'<div class="verify-icon">\u274c</div>'
+        +'<div class="verify-name" style="color:#dc2626">Certificat invalide</div>'
+        +'<div class="verify-detail">Aucun certificat trouve avec cet identifiant.<br>'
+        +'Il peut s\'agir d\'une falsification ou d\'une erreur de scan.</div></div>';
+      return;
+    }
+    const issued=new Date(cert.issued_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+    el.innerHTML='<div class="verify-card verify-valid">'
+      +'<div class="verify-icon">\u2705</div>'
+      +'<div style="font-size:11px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.5px">Certificat authentique</div>'
+      +'<div class="verify-name">'+esc(cert.respondent_name)+'</div>'
+      +'<div class="verify-detail">'
+      +'<strong>Evaluation :</strong> '+esc(cert.cert_title||'Certificat')+'<br>'
+      +'<strong>Score :</strong> '+cert.score_pct+'%'+(cert.mention?' \u2014 '+esc(cert.mention):'')+'<br>'
+      +'<strong>Delivre le :</strong> '+issued+'<br>'
+      +'<strong>Emis par :</strong> GERM_SARL EVALUATIONS<br>'
+      +'<strong>N\u00b0 :</strong> <code style="font-size:11px">'+certId.toUpperCase()+'</code>'
+      +'</div>'
+      +'<div style="margin-top:1.5rem;padding:.75rem;background:var(--bg2);border-radius:var(--r);font-size:11px;color:var(--text3)">'
+      +'Ce certificat a ete enregistre dans la base de donnees GERM SARL. Son authenticite est garantie.'
+      +'</div></div>';
+  }catch(e){
+    document.getElementById('verify-content').innerHTML='<div class="verify-card verify-invalid">'
+      +'<div class="verify-icon">\u26a0\ufe0f</div>'
+      +'<div class="verify-name">Erreur de verification</div>'
+      +'<div class="verify-detail">Impossible de contacter le serveur de verification.</div></div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// COMPTES RÉPONDANTS
+// ═══════════════════════════════════════════════════════════
+
+var currentRespondent=null;
+
+async function loginRespondent(email,password){
+  const hash=await sha256(password);
+  const{data,error}=await SB.from('respondents').select('*')
+    .eq('email',email.toLowerCase().trim()).eq('active',true).single();
+  if(error||!data||data.password_hash!==hash)return null;
+  currentRespondent=data;
+  try{sessionStorage.setItem('gs_respondent',JSON.stringify({id:data.id,name:data.name,email:data.email}));}catch(e){}
+  return data;
+}
+
+function loadRespondentSession(){
+  try{const s=sessionStorage.getItem('gs_respondent');if(s)currentRespondent=JSON.parse(s);}catch(e){}
+}
+function logoutRespondent(){
+  currentRespondent=null;
+  try{sessionStorage.removeItem('gs_respondent');}catch(e){}
+}
+
+async function renderRespondentLoginForm(code,qtitle){
+  const wrap=document.getElementById('quiz-container');
+  if(!wrap)return;
+  wrap.innerHTML='<div class="resp-login-wrap">'
+    +'<div style="text-align:center;margin-bottom:1.5rem">'
+    +'<div style="font-size:36px;margin-bottom:.5rem">\ud83d\udd10</div>'
+    +'<div style="font-size:17px;font-weight:700">Connexion requise</div>'
+    +'<div style="font-size:13px;color:var(--text2);margin-top:.25rem">'+esc(qtitle)+'</div>'
+    +'</div>'
+    +'<div class="fgroup"><label class="flabel">Email</label>'
+    +'<input id="resp-email" class="finput" type="email" placeholder="votre@email.com"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Mot de passe</label>'
+    +'<input id="resp-pwd" class="finput" type="password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" '
+    +'onkeydown="if(event.key===\'Enter\')doRespondentLogin(\''+code+'\')"></div>'
+    +'<div id="resp-login-err" style="font-size:12px;color:#dc2626;margin-top:.5rem;min-height:1rem"></div>'
+    +'<button class="btn btn-primary" style="width:100%;margin-top:.75rem;justify-content:center" '
+    +'onclick="doRespondentLogin(\''+code+'\')" id="resp-login-btn">Se connecter</button>'
+    +'<div style="font-size:11px;color:var(--text3);text-align:center;margin-top:.75rem">'
+    +'Contactez votre administrateur si vous n\'avez pas de compte.</div>'
+    +'</div>';
+  setTimeout(()=>{const e=document.getElementById('resp-email');if(e)e.focus();},100);
+}
+
+async function doRespondentLogin(code){
+  const email=(document.getElementById('resp-email')?.value||'').trim();
+  const pwd=document.getElementById('resp-pwd')?.value||'';
+  const errEl=document.getElementById('resp-login-err');
+  const btn=document.getElementById('resp-login-btn');
+  if(!email||!pwd){if(errEl)errEl.textContent='Email et mot de passe requis.';return;}
+  if(btn){btn.textContent='Connexion...';btn.disabled=true;}
+  const resp=await loginRespondent(email,pwd);
+  if(!resp){
+    if(errEl)errEl.textContent='Email ou mot de passe incorrect.';
+    if(btn){btn.textContent='Se connecter';btn.disabled=false;}
+    return;
+  }
+  toast('Bienvenue, '+resp.name+' !','success');
+  window._prefillName=resp.name;
+  window._prefillEmail=resp.email;
+  loadQuiz(code);
+}
+
+async function renderRespondentsPage(){
+  if(!isAdmin()){toast('Acces refuse.','error');return;}
+  navigate('questionnaires');
+  const contentEl=document.getElementById('content');
+  document.getElementById('tb-title').textContent='Comptes repondants';
+  document.getElementById('tb-actions').innerHTML=
+    '<button class="btn btn-primary btn-sm" onclick="openAddRespondentModal()">+ Nouveau compte</button> '
+    +'<label class="btn btn-sm" style="cursor:pointer" title="CSV: nom,email,motdepasse">'
+    +'\ud83d\udcbe Import CSV<input type="file" accept=".csv" style="display:none" onchange="importRespondentsCSV(this.files[0])"></label>';
+  contentEl.innerHTML='<div class="card" style="text-align:center;padding:1.5rem"><div style="color:var(--text3)">Chargement...</div></div>';
+  const{data:resps}=await SB.from('respondents').select('*').order('name');
+  if(!resps||!resps.length){
+    contentEl.innerHTML='<div class="card"><div class="empty"><div class="empty-title">Aucun compte repondant</div>'
+      +'<div class="empty-sub">Creez des comptes pour controler l\'acces a vos evaluations protegees.</div>'
+      +'<br><button class="btn btn-primary" onclick="openAddRespondentModal()" style="margin-top:.5rem">+ Creer un compte</button></div></div>';
+    return;
+  }
+  const rows=resps.map(r=>
+    '<tr><td data-label="Nom" style="padding:8px 10px;border-bottom:.5px solid var(--border)"><strong>'+esc(r.name)+'</strong></td>'
+    +'<td data-label="Email" style="padding:8px 10px;border-bottom:.5px solid var(--border);color:var(--text2)">'+esc(r.email)+'</td>'
+    +'<td style="padding:8px 10px;border-bottom:.5px solid var(--border)">'
+    +'<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:'+(r.active?'#dcfce7':'#fee2e2')+';color:'+(r.active?'#16a34a':'#dc2626')+'">'+(r.active?'Actif':'Inactif')+'</span></td>'
+    +'<td style="padding:8px 10px;border-bottom:.5px solid var(--border);font-size:12px;color:var(--text3)">'+fmt(r.created_at)+'</td>'
+    +'<td style="padding:8px 10px;border-bottom:.5px solid var(--border)">'
+    +'<button class="btn btn-xs" onclick="editRespondent(\''+r.id+'\',\''+esc(r.name)+'\',\''+esc(r.email)+'\','+r.active+')">Modifier</button> '
+    +'<button class="btn btn-xs" style="color:#dc2626" onclick="deleteRespondent(\''+r.id+'\',\''+esc(r.name)+'\')">Suppr.</button></td></tr>'
+  ).join('');
+  contentEl.innerHTML='<div class="card"><table style="width:100%;border-collapse:collapse"><thead><tr>'
+    +'<th style="text-align:left;padding:8px 10px;font-size:12px;color:var(--text3);border-bottom:.5px solid var(--border)">Nom</th>'
+    +'<th style="text-align:left;padding:8px 10px;font-size:12px;color:var(--text3);border-bottom:.5px solid var(--border)">Email</th>'
+    +'<th style="text-align:left;padding:8px 10px;font-size:12px;color:var(--text3);border-bottom:.5px solid var(--border)">Statut</th>'
+    +'<th style="text-align:left;padding:8px 10px;font-size:12px;color:var(--text3);border-bottom:.5px solid var(--border)">Cree le</th>'
+    +'<th style="border-bottom:.5px solid var(--border)"></th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function openAddRespondentModal(){
+  const m=document.getElementById('modal-gen');if(!m)return;
+  m.querySelector('.modal-inner').innerHTML=
+    '<div class="mhdr"><div class="mhdr-title">Nouveau compte repondant</div>'
+    +'<button class="mclose" onclick="closeModal(\'modal-gen\')">&#10005;</button></div>'
+    +'<div style="padding:1.25rem">'
+    +'<div class="fgroup"><label class="flabel">Nom complet *</label><input id="new-resp-name" class="finput" placeholder="Prenom Nom"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Email *</label><input id="new-resp-email" class="finput" type="email"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Mot de passe * (min. 6 car.)</label><input id="new-resp-pwd" class="finput" type="password"></div>'
+    +'<div class="mactions" style="margin-top:1.25rem">'
+    +'<button class="btn" onclick="closeModal(\'modal-gen\')">Annuler</button>'
+    +'<button class="btn btn-primary" onclick="createRespondent()">Creer le compte</button></div></div>';
+  openModal('modal-gen');
+}
+
+async function createRespondent(){
+  const name=(document.getElementById('new-resp-name')?.value||'').trim();
+  const email=(document.getElementById('new-resp-email')?.value||'').trim().toLowerCase();
+  const pwd=document.getElementById('new-resp-pwd')?.value||'';
+  if(!name||!email||!pwd){toast('Tous les champs requis.','error');return;}
+  if(pwd.length<6){toast('Mot de passe : 6 caracteres minimum.','error');return;}
+  const hash=await sha256(pwd);
+  const{error}=await SB.from('respondents').insert({name,email,password_hash:hash});
+  if(error){toast(error.code==='23505'?'Email deja utilise.':'Erreur : '+error.message,'error');return;}
+  closeModal('modal-gen');toast('Compte cree pour '+name,'success');renderRespondentsPage();
+}
+
+async function editRespondent(id,name,email,active){
+  const m=document.getElementById('modal-gen');if(!m)return;
+  m.querySelector('.modal-inner').innerHTML=
+    '<div class="mhdr"><div class="mhdr-title">Modifier le compte</div>'
+    +'<button class="mclose" onclick="closeModal(\'modal-gen\')">&#10005;</button></div>'
+    +'<div style="padding:1.25rem">'
+    +'<div class="fgroup"><label class="flabel">Nom</label><input id="edit-resp-name" class="finput" value="'+name+'"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Nouveau mot de passe (vide = inchange)</label><input id="edit-resp-pwd" class="finput" type="password"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'
+    +'<input type="checkbox" id="edit-resp-active" '+(active?'checked':'')+' style="width:15px;height:15px"> Compte actif</label></div>'
+    +'<div class="mactions" style="margin-top:1.25rem">'
+    +'<button class="btn" onclick="closeModal(\'modal-gen\')">Annuler</button>'
+    +'<button class="btn btn-primary" onclick="saveRespondent(\''+id+'\')">Enregistrer</button></div></div>';
+  openModal('modal-gen');
+}
+
+async function saveRespondent(id){
+  const name=(document.getElementById('edit-resp-name')?.value||'').trim();
+  const pwd=document.getElementById('edit-resp-pwd')?.value||'';
+  const active=!!(document.getElementById('edit-resp-active')?.checked);
+  if(!name){toast('Le nom est requis.','error');return;}
+  const upd={name,active};
+  if(pwd){if(pwd.length<6){toast('Mot de passe : 6 caracteres minimum.','error');return;}upd.password_hash=await sha256(pwd);}
+  const{error}=await SB.from('respondents').update(upd).eq('id',id);
+  if(error){toast('Erreur : '+error.message,'error');return;}
+  closeModal('modal-gen');toast('Compte mis a jour.','success');renderRespondentsPage();
+}
+
+async function deleteRespondent(id,name){
+  if(!confirm('Supprimer le compte de '+name+' ?'))return;
+  const{error}=await SB.from('respondents').delete().eq('id',id);
+  if(error){toast('Erreur suppression.','error');return;}
+  toast('Compte supprime.','info');renderRespondentsPage();
+}
+
+async function importRespondentsCSV(file){
+  if(!file)return;
+  const text=await file.text();
+  const lines=text.split('\n').filter(l=>l.trim());
+  let ok=0,fail=0;
+  for(const line of lines.slice(1)){
+    const parts=line.split(',');
+    if(parts.length<3){fail++;continue;}
+    const[name,email,pwd]=parts.map(p=>p.trim().replace(/^"|"$/g,''));
+    if(!name||!email||!pwd){fail++;continue;}
+    const hash=await sha256(pwd);
+    const{error}=await SB.from('respondents').upsert({name,email:email.toLowerCase(),password_hash:hash},{onConflict:'email'});
+    if(error)fail++;else ok++;
+  }
+  toast(ok+' compte(s) importe(s)'+(fail?' ('+fail+' erreur(s))':''),'success');
+  renderRespondentsPage();
+}
+
+
 async function init(){
+  var _vp=new URLSearchParams(window.location.search).get("verify");
+  if(_vp){initSupabase().then(function(){showVerifyPage(_vp);});return;}
+  loadRespondentSession();
   // Utiliser les clés injectées par le serveur, sinon celles du localStorage
   const url = (SUPA_URL_INJECT && SUPA_URL_INJECT.indexOf('SUPA_URL')===-1) ? SUPA_URL_INJECT : gc(K_URL);
   const key = (SUPA_KEY_INJECT && SUPA_KEY_INJECT.indexOf('SUPA_KEY')===-1) ? SUPA_KEY_INJECT : gc(K_KEY);
@@ -1427,6 +1735,7 @@ function openQModal(qid){
       document.getElementById('q-group-mode').value=q.group_mode?'1':'0';
       document.getElementById('q-require-sig').value=q.require_signature?'1':'0';
       document.getElementById('q-cert-threshold').value=q.cert_threshold||'';
+  var rl=document.getElementById('q-require-login');if(rl)rl.checked=!!q.require_login;
       document.getElementById('q-cert-title').value=q.cert_title||'';
       document.getElementById('q-duration').value=q.duration||0;
       document.getElementById('q-duration-unit').value=q.duration_unit||'minutes';
@@ -2008,6 +2317,7 @@ async function saveQuestionnaire(){
     require_signature:+document.getElementById('q-require-sig').value===1,
     cert_threshold:document.getElementById('q-cert-threshold').value?+document.getElementById('q-cert-threshold').value:null,
     cert_title:document.getElementById('q-cert-title').value.trim()||null,
+    require_login:!!(document.getElementById("q-require-login")&&document.getElementById("q-require-login").checked),
     duration:+document.getElementById('q-duration').value||0,
     duration_unit:document.getElementById('q-duration-unit').value,
     start_at:document.getElementById('q-start-at').value||null,
@@ -5508,7 +5818,7 @@ async function deleteOfflineResponse(id){try{const db=await openOfflineDB();retu
 async function syncOfflineResponses(){if(!navigator.onLine||!SB)return;const pending=await getPendingOfflineResponses();if(!pending.length)return;let synced=0;for(const item of pending){try{const{_savedAt,...payload}=item;const{error}=await SB.from("responses").insert(payload);if(!error){await deleteOfflineResponse(item.id);synced++;}}catch(e){}}if(synced>0){toast(synced+" reponse(s) synchronisee(s).","info");initRealtime();}}
 function initOfflineMode(){const upd=()=>{const off=!navigator.onLine;const b=document.getElementById("offline-banner");const ind=document.getElementById("offline-indicator");if(b)b.style.display=off?"block":"none";if(ind)ind.style.display=off?"flex":"none";};window.addEventListener("online",()=>{upd();syncOfflineResponses();});window.addEventListener("offline",upd);upd();}
 
-function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
+function generateCertificatePDF(q,nm,earned,pct,mention,certTitle,verifyUrl,qrDataUrl,certId){
   try{
     var lib=window.jspdf;
     if(!lib||!lib.jsPDF){console.warn("jsPDF absent");return null;}
@@ -5681,6 +5991,7 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle){
     doc.setTextColor(110,110,110);
     doc.text("Directeur General",s2,sY+10,{align:"center",maxWidth:60});
 
+    if(qrDataUrl){try{doc.addImage(qrDataUrl,"PNG",XR,H-33,22,22);}catch(_qe){}}
     /* Pied de page */
     doc.setDrawColor(CR,CG,CB);doc.setLineWidth(0.4);
     doc.line(XR,H-9,XR+RW,H-9);
