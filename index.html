@@ -3511,15 +3511,15 @@ function addTRow(qid,colCount){
   tbody.appendChild(tr);
 }
 
-async function submitR(){
+async function submitR(forced){
   // Sauvegarder les valeurs des champs membres
   _saveMemberValues();
 
   // Lire le premier membre
-  const name = (document.getElementById('r-name-0')?.value || groupMembers[0]?.name || '').trim();
-  const email = (document.getElementById('r-email-0')?.value || groupMembers[0]?.email || '').trim();
-  if(!name){toast('Veuillez entrer votre nom.','error');return;}
-  if(!email||!email.includes('@')){toast('Email invalide.','error');return;}
+  const name=(document.getElementById('r-name-0')?.value||groupMembers[0]?.name||(forced?'Anonyme':'')).trim();
+  const email=(document.getElementById('r-email-0')?.value||groupMembers[0]?.email||(forced?'anonyme@germ-sarl.local':'')).trim();
+  if(!forced&&!name){toast('Veuillez entrer votre nom.','error');return;}
+  if(!forced&&(!email||!email.includes('@'))){toast('Email invalide.','error');return;}
 
   // Mettre à jour groupMembers depuis les champs
   groupMembers.forEach((_,mi)=>{
@@ -3535,14 +3535,14 @@ async function submitR(){
   // Valider le nom du groupe si mode groupe
   if(curQ.group_mode){
     const gn=(document.getElementById('r-group-name')?.value||'').trim();
-    if(!gn){toast('Veuillez renseigner le nom du groupe.','error');return;}
-    groupName=gn;
+    if(!gn&&!forced){toast('Veuillez renseigner le nom du groupe.','error');return;}
+    groupName=gn||'Groupe';
   }
 
   // Valider tous les membres
   for(let mi=0;mi<groupMembers.length;mi++){
-    if(!groupMembers[mi].name){toast('Nom manquant pour le membre '+(mi+1)+'.','error');return;}
-    if(!groupMembers[mi].email||!groupMembers[mi].email.includes('@')){toast('Email invalide pour le membre '+(mi+1)+'.','error');return;}
+    if(!forced&&!groupMembers[mi].name){toast('Nom manquant pour le membre '+(mi+1)+'.','error');return;}
+    if(!forced&&(!groupMembers[mi].email||!groupMembers[mi].email.includes('@'))){toast('Email invalide pour le membre '+(mi+1)+'.','error');return;}
   }
 
   // Vérifier max_attempts
@@ -3561,7 +3561,7 @@ async function submitR(){
     if(qq.type==='table')return!ans||!ans.rows||ans.rows.every(r=>!r.phrase&&(!r.cols||r.cols.every(c=>!c)));
     return!ans&&ans!==0;
   });
-  if(missing.length>0){
+  if(missing.length>0&&!forced){
     missing.forEach(qq=>{
       const c=document.getElementById('qcard-'+qq.id);
       if(c){c.style.borderColor='var(--red-border)';c.style.boxShadow='0 0 0 3px rgba(163,45,45,.15)';
@@ -3780,7 +3780,7 @@ function startTimer(q){
     if(endTime<=Date.now()){
       localStorage.removeItem(storageKey);
       document.getElementById('r-sub').innerHTML='<span style="color:#ff6b6b;font-weight:600">&#9203; Temps écoulé !</span>';
-      submitR();
+      submitR(true);
       return;
     }
   } else {
@@ -3796,7 +3796,7 @@ function startTimer(q){
       clearInterval(timerInterval);
       localStorage.removeItem(storageKey);
       if(bar)bar.innerHTML='<span style="color:#ff6b6b;font-weight:600">&#9203; Temps écoulé !</span>';
-      submitR();
+      submitR(true);
       return;
     }
     const h=Math.floor(left/3600000),mn=Math.floor((left%3600000)/60000),s=Math.floor((left%60000)/1000);
