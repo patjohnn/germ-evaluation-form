@@ -1198,7 +1198,7 @@ async function doRespondentLogin(code){
 }
 
 async function renderRespondentsPage(){
-  if(!isAdmin()){toast('Acces refuse.','error');return;}
+  if(!isAdmin()&&userRole()!='corrector'){toast('Acces refuse.','error');return;}
   navigate('questionnaires');
   const contentEl=document.getElementById('content');
   document.getElementById('tb-title').textContent='Comptes repondants';
@@ -2614,32 +2614,7 @@ function buildRespDetailHtml(q,r){
   return html;
 }
 
-async function adminGenerateCert(rid,qid){
-  const [{data:q},{data:r}]=await Promise.all([
-    SB.from('questionnaires').select('*').eq('id',qid).single(),
-    SB.from('responses').select('*').eq('id',rid).single()
-  ]);
-  if(!q||!r){toast('Introuvable.','error');return;}
-  const autoSc=autoGrade(q,r.answers||{});
-  const manSc=r.manual_scores||{};
-  const totalPts=calcTotalPts(q);
-  let earned=0;
-  (q.questions||[]).forEach(qq=>{
-    const ms=manSc[qq.id],as=autoSc[qq.id];
-    if(ms!==undefined&&ms!==null)earned+=+ms;
-    else if(as!==null&&as!==undefined)earned+=+as;
-  });
-  const pct=totalPts>0?Math.round(earned/totalPts*100):0;
-  const name=r.group_name||r.respondent_name||'Repondant';
-  if(!q.cert_threshold||pct<+q.cert_threshold){toast('Seuil non atteint : '+pct+'% / '+q.cert_threshold+'% requis.','error');return;}
-  const b64=generateCertificatePDF(q,name,earned,pct,getMention(pct).txt,q.cert_title||'Certificat de reussite');
-  if(!b64){toast('Erreur certificat.','error');return;}
-  const a=document.createElement('a');
-  a.href='data:application/pdf;base64,'+b64;
-  a.download='Certificat_'+name.replace(/\s+/g,'_').slice(0,25)+'.pdf';
-  a.click();
-  toast('Certificat telecharge !');
-}
+
 
 async function _goRespPage(page){
   _respPage=page;
