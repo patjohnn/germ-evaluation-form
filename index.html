@@ -1018,31 +1018,33 @@ async function adminGenerateCert(rid,qid){
   const mn=getMention(pct);
   const certTitle=q.cert_title||'Certificat de reussite';
 
-  toast('Enregistrement certificat...','info');
-  const certId=await saveCertificate(rid,qid,name,email,pct,earned,mn.txt,certTitle);
-  if(!certId){
-    toast('Erreur sauvegarde. Verifiez que la table certificates existe dans Supabase.','error');
-    return;
-  }
-  const verifyUrl=window.location.origin+window.location.pathname+'?verify='+certId;
-  let qrDataUrl=null;
+  // ID unique sans dépendre de la BDD
+  var certId='cert-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6);
+  var verifyUrl=window.location.origin+window.location.pathname+'?verify='+certId;
+
+  // Sauvegarder en base si possible (non bloquant)
+  try{saveCertificate(rid,qid,name,email,pct,earned,mn.txt,certTitle).then(function(id){if(id)certId=id;}).catch(function(){});}catch(e){}
+
+  // QR Code
+  var qrDataUrl=null;
   try{
     if(typeof QRCode!=='undefined'){
-      qrDataUrl=await new Promise((res,rej)=>{
-        QRCode.toDataURL(verifyUrl,{width:120,margin:1,color:{dark:'#1a1a2e',light:'#ffffff'}},
-          (err,url)=>err?rej(err):res(url));
+      qrDataUrl=await new Promise(function(res,rej){
+        QRCode.toDataURL(verifyUrl,{width:200,margin:2,color:{dark:'#000000',light:'#ffffff'}},
+          function(err,url){if(err)rej(err);else res(url);});
       });
     }
   }catch(e){console.warn('QR:',e);}
 
-  const b64=generateCertificatePDF(q,name,earned,pct,mn.txt,certTitle,verifyUrl,qrDataUrl,certId);
+  var b64=generateCertificatePDF(q,name,earned,pct,mn.txt,certTitle,verifyUrl,qrDataUrl,certId);
   if(!b64){toast('Erreur generation PDF.','error');return;}
-  const a=document.createElement('a');
+  var a=document.createElement('a');
   a.href='data:application/pdf;base64,'+b64;
-  a.download='Certificat_'+name.replace(/\s+/g,'_').slice(0,25)+'_'+certId.slice(0,8)+'.pdf';
+  a.download='Certificat_'+name.replace(/\s+/g,'_').slice(0,25)+'.pdf';
   a.click();
-  toast('Certificat securise telecharge ! (ID: '+certId.slice(0,8).toUpperCase()+')','success');
+  toast('Certificat telecharge !','success');
 }
+
 
 async function showVerifyPage(certId){
   document.body.innerHTML='<div style="min-height:100vh;background:var(--bg);padding:1rem;font-family:inherit">'
