@@ -1237,11 +1237,10 @@ function openAddRespondentModal(){
   let m=document.getElementById('modal-gen');
   if(!m){
     m=document.createElement('div');m.id='modal-gen';
-    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem';
-    const mi=document.createElement('div');mi.className='modal-inner';
+    m.className='modal-overlay';
+    var mi=document.createElement('div');mi.className='modal-inner';
     mi.style.cssText='width:100%;max-width:460px;max-height:90vh;overflow-y:auto;background:var(--bg);border-radius:var(--rxl);box-shadow:0 20px 60px rgba(0,0,0,.3)';
     m.appendChild(mi);document.body.appendChild(m);
-    m.addEventListener('click',function(e){if(e.target===m)closeModal('modal-gen');});
   }
   m.querySelector('.modal-inner').innerHTML=
     '<div class="mhdr"><div class="mhdr-title">Nouveau compte repondant</div>'
@@ -1272,11 +1271,10 @@ async function editRespondent(id,name,email,active){
   let m=document.getElementById('modal-gen');
   if(!m){
     m=document.createElement('div');m.id='modal-gen';
-    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem';
-    const mi=document.createElement('div');mi.className='modal-inner';
+    m.className='modal-overlay';
+    var mi=document.createElement('div');mi.className='modal-inner';
     mi.style.cssText='width:100%;max-width:460px;max-height:90vh;overflow-y:auto;background:var(--bg);border-radius:var(--rxl);box-shadow:0 20px 60px rgba(0,0,0,.3)';
     m.appendChild(mi);document.body.appendChild(m);
-    m.addEventListener('click',function(e){if(e.target===m)closeModal('modal-gen');});
   }
   m.querySelector('.modal-inner').innerHTML=
     '<div class="mhdr"><div class="mhdr-title">Modifier le compte</div>'
@@ -3194,7 +3192,98 @@ async function loadRespondentByCode(code){
       +'</div>';
     return;
   }
+  // Connexion requise
+  if(q.require_login&&!currentRespondent){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('admin-app').style.display='none';
+    document.getElementById('respondent-app').style.display='block';
+    document.getElementById('r-title').textContent=q.title;
+    document.getElementById('r-sub').textContent='';
+    renderRespondentLoginInApp(q.code,q.title);
+    return;
+  }
   openRView(q);
+}
+
+function renderRespondentLoginInApp(code,qtitle){
+  var el=document.getElementById('r-content');
+  if(!el)return;
+  el.innerHTML='<div style="max-width:360px;margin:2rem auto;padding:2rem;border-radius:var(--rxl);border:.5px solid var(--border);background:var(--bg)">'
+    +'<div style="text-align:center;margin-bottom:1.5rem">'
+    +'<div style="font-size:40px;margin-bottom:.5rem">&#128272;</div>'
+    +'<div style="font-size:17px;font-weight:700">Connexion requise</div>'
+    +'<div style="font-size:13px;color:var(--text2);margin-top:.25rem">'+esc(qtitle||'')+'</div></div>'
+    +'<div class="fgroup"><label class="flabel">Email</label>'
+    +'<input id="rapp-email" class="finput" type="email" placeholder="votre@email.com"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Mot de passe</label>'
+    +'<input id="rapp-pwd" class="finput" type="password" placeholder="&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;"></div>'
+    +'<div id="rapp-err" style="font-size:12px;color:#dc2626;margin-top:.5rem;min-height:1rem"></div>'
+    +'<button class="btn btn-primary" style="width:100%;margin-top:.75rem;justify-content:center" onclick="doRAppLogin(\''+code+'\')" id="rapp-btn">Se connecter</button>'
+    +'<div style="text-align:center;margin-top:.75rem;font-size:12px;color:var(--text3)">Pas encore de compte ? <a href="#" style="color:var(--purple-text,#7c3aed)" onclick="event.preventDefault();renderRegisterInApp(\''+code+'\')">S\'inscrire</a></div>'
+    +'</div>';
+  setTimeout(function(){var e=document.getElementById('rapp-email');if(e)e.focus();},100);
+}
+
+async function doRAppLogin(code){
+  var email=(document.getElementById('rapp-email')&&document.getElementById('rapp-email').value||'').trim();
+  var pwd=document.getElementById('rapp-pwd')&&document.getElementById('rapp-pwd').value||'';
+  var err=document.getElementById('rapp-err');
+  var btn=document.getElementById('rapp-btn');
+  if(!email||!pwd){if(err)err.textContent='Email et mot de passe requis.';return;}
+  if(btn){btn.textContent='Connexion...';btn.disabled=true;}
+  var resp=await loginRespondent(email,pwd);
+  if(!resp){
+    if(err)err.textContent='Email ou mot de passe incorrect.';
+    if(btn){btn.textContent='Se connecter';btn.disabled=false;}
+    return;
+  }
+  window._prefillName=resp.name;
+  window._prefillEmail=resp.email;
+  toast('Bienvenue, '+resp.name+' !','success');
+  await loadRespondentByCode(code);
+}
+
+function renderRegisterInApp(code){
+  var el=document.getElementById('r-content');
+  if(!el)return;
+  el.innerHTML='<div style="max-width:360px;margin:2rem auto;padding:2rem;border-radius:var(--rxl);border:.5px solid var(--border);background:var(--bg)">'
+    +'<div style="text-align:center;margin-bottom:1.5rem">'
+    +'<div style="font-size:36px;margin-bottom:.5rem">&#128221;</div>'
+    +'<div style="font-size:17px;font-weight:700">Cr\u00e9er un compte</div>'
+    +'<div style="font-size:12px;color:var(--text3);margin-top:.25rem">&#9888;&#65039; Votre compte sera valid\u00e9 par un administrateur</div></div>'
+    +'<div class="fgroup"><label class="flabel">Nom complet *</label>'
+    +'<input id="reg2-name" class="finput" placeholder="Pr\u00e9nom Nom"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Email *</label>'
+    +'<input id="reg2-email" class="finput" type="email" placeholder="votre@email.com"></div>'
+    +'<div class="fgroup" style="margin-top:.75rem"><label class="flabel">Mot de passe * (min. 6 car.)</label>'
+    +'<input id="reg2-pwd" class="finput" type="password"></div>'
+    +'<div id="reg2-err" style="font-size:12px;color:#dc2626;margin-top:.5rem;min-height:1rem"></div>'
+    +'<button class="btn btn-primary" style="width:100%;margin-top:.75rem;justify-content:center" onclick="doReg2(\''+code+'\')">S\'inscrire</button>'
+    +'<div style="text-align:center;margin-top:.75rem">'
+    +'<button class="btn btn-sm" onclick="renderRespondentLoginInApp(\''+code+'\',\'\')">&#8592; Retour connexion</button></div>'
+    +'</div>';
+  setTimeout(function(){var e=document.getElementById('reg2-name');if(e)e.focus();},100);
+}
+
+async function doReg2(code){
+  var name=(document.getElementById('reg2-name')&&document.getElementById('reg2-name').value||'').trim();
+  var email=(document.getElementById('reg2-email')&&document.getElementById('reg2-email').value||'').trim().toLowerCase();
+  var pwd=document.getElementById('reg2-pwd')&&document.getElementById('reg2-pwd').value||'';
+  var err=document.getElementById('reg2-err');
+  if(!name||!email||!pwd){if(err)err.textContent='Tous les champs requis.';return;}
+  if(pwd.length<6){if(err)err.textContent='Mot de passe : 6 caract\u00e8res minimum.';return;}
+  var hash=await sha256(pwd);
+  var res=await SB.from('respondents').insert({name:name,email:email,password_hash:hash,active:false});
+  if(res.error){
+    if(err)err.textContent=res.error.code==='23505'?'Email d\u00e9j\u00e0 utilis\u00e9.':('Erreur: '+res.error.message);
+    return;
+  }
+  var el=document.getElementById('r-content');
+  if(el)el.innerHTML='<div style="max-width:360px;margin:2rem auto;padding:2rem;text-align:center">'
+    +'<div style="font-size:48px;margin-bottom:1rem">&#9989;</div>'
+    +'<div style="font-size:17px;font-weight:700;margin-bottom:.5rem">Inscription envoy\u00e9e !</div>'
+    +'<div style="font-size:13px;color:var(--text2)">Votre compte est en attente de validation.<br>Un administrateur va activer votre acc\u00e8s.</div>'
+    +'<button class="btn btn-sm" style="margin-top:1.5rem" onclick="renderRespondentLoginInApp(\''+code+'\',\'\')">&#8592; Retour connexion</button></div>';
 }
 
 function openRView(q){
@@ -6055,13 +6144,13 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle,verifyUrl,qrDa
     doc.setTextColor(110,110,110);
     doc.text("Directeur General",s2,sY+10,{align:"center",maxWidth:60});
 
-    /* QR Code anti-falsification sous la date */
+    /* QR Code juste sous la date */
     if(qrDataUrl){
       try{
-        var _qrB64=qrDataUrl.split(",").pop();
-        doc.addImage(_qrB64,"PNG",midX-12,Y+5,24,24);
+        var _qrFull=qrDataUrl.indexOf("base64,")>-1?qrDataUrl:("data:image/png;base64,"+qrDataUrl);
+        doc.addImage(_qrFull,"PNG",midX-12,Y+4,24,24);
         doc.setFont("helvetica","normal");doc.setFontSize(6);doc.setTextColor(120,120,120);
-        doc.text("Scanner pour verifier",midX,Y+32,{align:"center",maxWidth:RW});
+        doc.text("Scanner pour verifier l'authenticite",midX,Y+30,{align:"center",maxWidth:RW});
       }catch(_qe){console.warn("QR PDF err:",_qe);}
     }
     /* Pied de page */
