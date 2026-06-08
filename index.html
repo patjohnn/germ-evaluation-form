@@ -6117,6 +6117,18 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle,verifyUrl,qrDa
     doc.setTextColor(80,80,80);
     var ds=new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"});
     doc.text("Delivre le : "+ds,midX,Y,{align:"center",maxWidth:RW});
+    var _dateY=Y;
+
+    /* QR Code anti-falsification — juste sous la date */
+    if(qrDataUrl){
+      try{
+        var _qrFull=qrDataUrl.startsWith("data:")?qrDataUrl:("data:image/png;base64,"+qrDataUrl);
+        doc.addImage(_qrFull,"PNG",midX-12,_dateY+4,24,24);
+        doc.setFont("helvetica","normal");doc.setFontSize(5.5);
+        doc.setTextColor(130,130,130);
+        doc.text("Scanner pour verifier l'authenticite",midX,_dateY+30,{align:"center",maxWidth:80});
+      }catch(_qe){console.warn("QR err:",_qe);}
+    }
 
     /* Séparateur signatures */
     doc.setDrawColor(200,200,200);doc.setLineWidth(0.4);
@@ -6144,15 +6156,6 @@ function generateCertificatePDF(q,nm,earned,pct,mention,certTitle,verifyUrl,qrDa
     doc.setTextColor(110,110,110);
     doc.text("Directeur General",s2,sY+10,{align:"center",maxWidth:60});
 
-    /* QR Code juste sous la date */
-    if(qrDataUrl){
-      try{
-        var _qrFull=qrDataUrl.indexOf("base64,")>-1?qrDataUrl:("data:image/png;base64,"+qrDataUrl);
-        doc.addImage(_qrFull,"PNG",midX-12,Y+4,24,24);
-        doc.setFont("helvetica","normal");doc.setFontSize(6);doc.setTextColor(120,120,120);
-        doc.text("Scanner pour verifier l'authenticite",midX,Y+30,{align:"center",maxWidth:RW});
-      }catch(_qe){console.warn("QR PDF err:",_qe);}
-    }
     /* Pied de page */
     doc.setDrawColor(CR,CG,CB);doc.setLineWidth(0.4);
     doc.line(XR,H-9,XR+RW,H-9);
@@ -6384,6 +6387,6 @@ init();
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-gen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:1rem"><div class="modal-inner" style="width:100%;max-width:460px;max-height:90vh;overflow-y:auto;background:var(--bg);border-radius:var(--rxl);box-shadow:0 20px 60px rgba(0,0,0,.3)"></div></div>
+<div class="modal-overlay" id="modal-gen"><div class="modal-inner" style="width:100%;max-width:460px;max-height:90vh;overflow-y:auto;background:var(--bg);border-radius:var(--rxl);box-shadow:0 20px 60px rgba(0,0,0,.3)"></div></div>
 </body>
 </html>
