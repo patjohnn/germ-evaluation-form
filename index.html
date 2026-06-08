@@ -852,9 +852,17 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
       <div class="fgroup" style="margin-bottom:0"><label class="flabel">Signature requise</label>
         <select id="q-require-sig"><option value="0">Non</option><option value="1">Oui</option></select>
       </div>
-      <div class="fgroup" style="margin-bottom:0"><label class="flabel">&#127881; Certificat (seuil %)</label>
-      </div><div class="fgroup" style="margin-bottom:.75rem"><label class="flabel">Affichage des réponses</label><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="q-show-answers" style="width:15px;height:15px"> Montrer les bonnes réponses aux répondants après soumission</label>
+      <div class="fgroup" style="margin-bottom:.75rem">
+        <label class="flabel">&#127881; Certificat (seuil %)</label>
         <input type="number" id="q-cert-threshold" min="0" max="100" placeholder="Ex: 70">
+      </div>
+      <div class="fgroup" style="margin-bottom:.75rem">
+        <label class="flabel">&#128065; Affichage des réponses après soumission</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="checkbox" id="q-show-answers" style="width:15px;height:15px">
+          Permettre aux répondants de voir les bonnes réponses après soumission
+        </label>
+      </div>
       </div>
       <div class="fgroup" style="margin-bottom:0"><label class="flabel">Titre certificat</label>
         <input type="text" id="q-cert-title" placeholder="Certificat de r&#233;ussite">
