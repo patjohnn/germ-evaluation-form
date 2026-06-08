@@ -1201,7 +1201,12 @@ async function doRespondentLogin(code){
 
 async function renderRespondentsPage(){
   if(!isAdmin()&&userRole()!='corrector'){toast('Acces refuse.','error');return;}
-  navigate('questionnaires');
+  // Mise a jour nav sans race condition
+  document.querySelectorAll('.nav-item').forEach(function(e){e.classList.remove('active');});
+  var _nq=document.getElementById('nav-questionnaires');if(_nq)_nq.classList.add('active');
+  if(typeof updateMobileTitle!=='undefined')updateMobileTitle('Repondants');
+  document.getElementById('admin-app').style.display='block';
+  document.getElementById('login-screen').style.display='none';
   const contentEl=document.getElementById('content');
   document.getElementById('tb-title').textContent='Comptes repondants';
   document.getElementById('tb-actions').innerHTML=
