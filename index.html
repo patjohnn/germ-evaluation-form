@@ -853,6 +853,7 @@ create policy "admin_delete_r" on responses for delete using (true);</pre>
         <select id="q-require-sig"><option value="0">Non</option><option value="1">Oui</option></select>
       </div>
       <div class="fgroup" style="margin-bottom:0"><label class="flabel">&#127881; Certificat (seuil %)</label>
+      </div><div class="fgroup" style="margin-bottom:.75rem"><label class="flabel">Affichage des réponses</label><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="q-show-answers" style="width:15px;height:15px"> Montrer les bonnes réponses aux répondants après soumission</label>
         <input type="number" id="q-cert-threshold" min="0" max="100" placeholder="Ex: 70">
       </div>
       <div class="fgroup" style="margin-bottom:0"><label class="flabel">Titre certificat</label>
@@ -1800,6 +1801,7 @@ function openQModal(qid){
       document.getElementById('q-require-sig').value=q.require_signature?'1':'0';
       document.getElementById('q-cert-threshold').value=q.cert_threshold||'';
   var rl=document.getElementById('q-require-login');if(rl)rl.checked=!!q.require_login;
+  var sa=document.getElementById('q-show-answers');if(sa)sa.checked=!!q.show_answers;
       document.getElementById('q-cert-title').value=q.cert_title||'';
       document.getElementById('q-duration').value=q.duration||0;
       document.getElementById('q-duration-unit').value=q.duration_unit||'minutes';
@@ -2382,6 +2384,7 @@ async function saveQuestionnaire(){
     cert_threshold:document.getElementById('q-cert-threshold').value?+document.getElementById('q-cert-threshold').value:null,
     cert_title:document.getElementById('q-cert-title').value.trim()||null,
     require_login:!!(document.getElementById("q-require-login")&&document.getElementById("q-require-login").checked),
+    show_answers:!!(document.getElementById("q-show-answers")&&document.getElementById("q-show-answers").checked),
     duration:+document.getElementById('q-duration').value||0,
     duration_unit:document.getElementById('q-duration-unit').value,
     start_at:document.getElementById('q-start-at').value||null,
@@ -4417,16 +4420,19 @@ function showResultDetail(rIdx,qIdx){
 
         // Bonne réponse si incorrect/partiel
         if(isGraded&&hasAutoCorr&&pts!==null&&+pts<maxPts){
-          let correctStr='';
-          if(qq.type==='qcm'&&qq.options) correctStr=qq.options[ca]||'';
-          else if(qq.type==='yesno') correctStr=ca;
-          else if(qq.type==='checkbox'&&Array.isArray(ca)) correctStr=ca.map(i=>qq.options[i]).join(', ');
-          if(correctStr){
-            html+='<div style="display:flex;align-items:center;gap:6px;margin-top:.35rem;font-size:12px;color:#16a34a">';
-            html+='<span>&#10003;</span><span>Bonne réponse : <strong>'+esc(correctStr)+'</strong></span>';
-            html+='</div>';
+
+          html+='<div style="display:flex;align-items:center;gap:5px;margin-top:.35rem;font-size:12px;color:#dc2626"><span>&#10007;</span><span>Réponse incorrecte</span></div>';
+
+          if(q&&q.show_answers){
+
+            let cStr='';if(qq.type==='qcm'&&qq.options)cStr=qq.options[ca]||'';else if(qq.type==='yesno')cStr=ca;else if(qq.type==='checkbox'&&Array.isArray(ca))cStr=ca.map(i=>qq.options[i]).join(', ');
+
+            if(cStr)html+='<div style="display:flex;align-items:center;gap:6px;margin-top:.25rem;font-size:12px;color:#16a34a"><span>&#10003;</span><span>Bonne réponse : <strong>'+esc(cStr)+'</strong></span></div>';
+
           }
+
         }
+
       }
 
       // Commentaire correcteur
