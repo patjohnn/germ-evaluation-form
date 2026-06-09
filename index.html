@@ -3601,7 +3601,7 @@ async function submitR(forced){
 
   // Mode hors-ligne : sauvegarder localement si pas de connexion
   if(!navigator.onLine){
-    const offlinePayload={id:newId,questionnaire_id:curQ.id,respondent_name:curQ.group_mode&&groupName?groupName:name,respondent_email:respondentEmail,group_name:curQ.group_mode?groupName:null,group_members:groupMembers,answers:rAns,signature:sigData||null,final_score:pending===0?earned:null,total_points:totalPts,score_pct:pending===0?pct:null,graded:pending===0,comments:{},manual_scores:{}};
+    const offlinePayload={id:newId,questionnaire_id:curQ.id,respondent_name:curQ.group_mode&&groupName?groupName:name,respondent_email:respondentEmail,group_name:curQ.group_mode?groupName:null,group_members:groupMembers,answers:rAns,signature:sigData||null,final_score:(pending===0||forced)?earned:null,total_points:totalPts,score_pct:(pending===0||forced)?pct:null,graded:(pending===0||forced),comments:{},manual_scores:{}};
     await saveOfflineResponse(offlinePayload);
     clearProgress(curQ.id);clearInterval(window._autoSave);clearInterval(timerInterval);localStorage.removeItem('evalpro_timer_'+curQ.id);
     document.getElementById('r-content').innerHTML='<div style="text-align:center;padding:2rem"><div style="font-size:48px">&#9889;</div><div style="font-size:16px;font-weight:600;margin:.5rem 0">Réponses sauvegardées hors-ligne</div><div style="font-size:13px;color:var(--text2)">Vos réponses seront envoyées automatiquement dès la reconnexion.</div><button class="btn" onclick="goHome()" style="margin-top:1.5rem">&#8592; Retour</button></div>';
@@ -3615,7 +3615,7 @@ async function submitR(forced){
     group_members:groupMembers,
     answers:JSON.parse(JSON.stringify(rAns)),
     signature:sigData,
-    final_score:pending===0?earned:null,
+    final_score:(pending===0||forced)?earned:null,
     total_points:totalPts,
     score_pct:pending===0?pct:null,
     graded:pending===0
@@ -4059,7 +4059,7 @@ function generatePDF(q, members, answers, sigData, scoreInfo, comments, manualSc
         else if(ans!==null&&ans!==undefined) ansStr=String(ans);
 
         let correctStr='';
-        if(hasAutoCorr&&scoreInfo&&pts!==null&&+pts<maxPts){
+        if(hasAutoCorr&&scoreInfo&&pts!==null&&+pts<maxPts&&q.show_answers){
           if(qq.type==='qcm'&&qq.options) correctStr=qq.options[ca]||'';
           else if(qq.type==='yesno') correctStr=String(ca);
           else if(qq.type==='checkbox'&&Array.isArray(ca)) correctStr=ca.map(i=>qq.options[i]).join(', ');
